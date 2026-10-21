@@ -97,6 +97,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A monthly waste schedule says "Every N months" in the schedule dialog.** The interval field
+  counted months for the monthly repeat options but was always labelled in weeks. The label now
+  follows the selected repeat option.
+
 - **A CalDAV outage or an expired password no longer brings deleted entries back (#1863).** A
   deletion or change that the server refuses is retried up to five times before Yuvomi gives up and
   takes the server's version again. Until now every refusal counted, also those that say nothing

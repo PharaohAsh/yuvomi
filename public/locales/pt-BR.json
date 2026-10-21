@@ -6361,6 +6361,7 @@
         "weekdaySat": "sáb",
         "weekdaySun": "dom",
         "intervalLabelWeekly": "A cada quantas semanas",
+        "intervalLabelMonthly": "A cada quantos meses",
         "anchorDateLabel": "Data inicial",
         "monthDayLabel": "Dia do mês",
         "monthDayLastDay": "Último dia do mês",
