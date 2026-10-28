@@ -1630,9 +1630,11 @@ test('Wand-Display: gleiche Programm-Zeilen und gleicher Ueberlauf wie das Mitgl
     const memberDay = day(memberWall);
     assert.deepEqual(day(displayWall), memberDay, 'Programm und Ueberlauf stimmen ueberein');
 
-    // Display-Berechtigung: die fuenf Wand-Module auf none, wie ein echtes Display-Credential.
+    // Display-Berechtigung: die fuenf Wand-Module auf none, wie ein echtes Display-Credential -
+    // und die Widgets erben die Sperre (resolvePermissions), sonst misst der Test ein Credential,
+    // das es nicht gibt, und die Abfuhr fehlte an der echten Wand trotzdem.
     const displayModulePerms = { meals: 'none', shopping: 'none', housekeeping: 'none', waste: 'none', pantry: 'none' };
-    setPermissions({ admin: false, modules: displayModulePerms, widgets: {}, capabilities: {} });
+    setPermissions({ admin: false, modules: displayModulePerms, widgets: { ...displayModulePerms }, capabilities: {} });
 
     // none-Rechte + isDisplay: dieselben Zeilen wie mit Admin-Rechten (gemessener Baseline).
     assert.deepEqual(

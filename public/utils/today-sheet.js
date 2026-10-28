@@ -412,7 +412,10 @@ export function todaySheetContext({
     if (isDisplay && WALL_DISPLAY_MODULES.has(module)) return false;
     return moduleAccess(module) === 'none';
   };
-  return { todayKey, tomorrowKey, nowTime, isAdmin, viewer, moduleOff, canSeeWidget, widgetShown, existing };
+  // Dieselbe Ausnahme fuer das Widget-Recht: es erbt die Modulsperre
+  // (resolvePermissions), und ohne sie schwieg die Abfuhr an der Wand doch.
+  const canSee = (widget) => (isDisplay && WALL_DISPLAY_MODULES.has(widget)) || canSeeWidget(widget);
+  return { todayKey, tomorrowKey, nowTime, isAdmin, viewer, moduleOff, canSeeWidget: canSee, widgetShown, existing };
 }
 
 /** Die Zeilen aller sprechenden Quellen, plus ob eine davon „heute erledigt" meldet. */
