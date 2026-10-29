@@ -335,6 +335,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that is not a colour falls back to the default blue on update.
 
 ### Fixed
+- **Amount fields accept comma or point decimals across devices.** (#2170) Budget entries,
+  transfers, confirmations, plans, subscriptions, shopping prices, inventory, housekeeping,
+  rewards and shared expenses preserve cents even when the keyboard and household number
+  formats differ. Existing amounts use the household's number format when edited. Currency
+  precision checks still apply; malformed amounts and ambiguous thousands grouping are
+  rejected before saving.
 - **The dashboard and calendar are fast again with synced recurring events** (#2226). Since the
   fix for occurrences on the clock change day (#2034), every occurrence of a repeating event is
   placed in its time zone with several lookups, and each lookup set up a fresh date formatter - the
