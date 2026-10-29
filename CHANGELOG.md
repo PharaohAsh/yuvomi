@@ -348,6 +348,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that is not a colour falls back to the default blue on update.
 
 ### Fixed
+- **Weights in grams and kilograms sit on the same line** (#2328). A weight sent over the API in
+  grams (95400 g) was drawn next to the kilogram readings as a spike at 95400, and the change card
+  showed +95,304.7. Readings of one kind are now converted to a single unit before the chart, the
+  average and the change are calculated - the unit most of your readings use, otherwise kilograms.
+  The same applies to height and head circumference (cm, m, mm, in), temperature (°C, °F) and blood
+  sugar (mg/dL, mmol/L). The stored readings stay as they were sent.
 - **SMTP with encryption "None" sends without encryption** (#2326). Until now Yuvomi still switched
   to STARTTLS whenever the mail server offered it, so an internal relay on port 25 with a self-signed
   certificate failed with "self-signed certificate". "None" now never upgrades the connection, both
