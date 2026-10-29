@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.83.0] - 2026-10-29
+
 ### Added
 - **Secrets can be read from files (`<NAME>_FILE`).** `SESSION_SECRET`, `DB_ENCRYPTION_KEY` and the
   other secrets (client secrets, passwords, API keys) can now come from a file instead of an
