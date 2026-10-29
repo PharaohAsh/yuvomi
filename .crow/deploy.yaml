@@ -1,0 +1,26 @@
+# On push to main, build the image on the host's docker daemon and recreate
+# the compose stack running the yuvomi container.
+# Shell lives in deploy.sh: Crow runs this file through envsubst, so no dollar signs here.
+
+when:
+  - event: [push, manual]
+    branch: main
+
+steps:
+  - name: deploy
+    image: docker:28-cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - sh .crow/deploy.sh
+
+  - name: notify-failure
+    image: alpine:3
+    when:
+      status: [failure]
+    environment:
+      NTFY_URL:
+        from_secret: ntfy_url
+    commands:
+      - apk add --no-cache curl
+      - sh .crow/notify-failure.sh
