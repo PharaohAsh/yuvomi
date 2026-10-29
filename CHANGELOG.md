@@ -348,6 +348,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that is not a colour falls back to the default blue on update.
 
 ### Fixed
+- **Recipes mirrored from Mealie bring their steps along** (#2363). The mirror took over title,
+  ingredients and image, but not the preparation steps. The notes of a mirrored recipe now show
+  Mealie's description followed by the steps as a numbered list, with a step's title in front of its
+  text. Empty steps are left out. Recipes that were mirrored before are fetched once more on the
+  next sync after the update, so they get their steps too.
 - **Recurring tasks keep their repeat on a CalDAV server** (#2350). A task that repeats in Yuvomi
   went to the server as a one-off task: the outgoing VTODO carried title, due date and status but no
   `RRULE`, so Tasks.org, Thunderbird or a Baikal-backed phone showed it once. The rule now goes along
