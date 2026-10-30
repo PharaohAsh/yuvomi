@@ -2008,6 +2008,8 @@
         "screensaverIdleLabel": "Starta skärmsläckaren efter",
         "screensaverIdleHint": "Hur länge den här enheten är orörd innan fotoskärmsläckaren startar. Gäller bara den här enheten, inte resten av hushållet. Gäller när en administratör har anslutit Immich.",
         "screensaverIdleSaved": "Väntetid för skärmsläckaren på den här enheten: {{delay}}.",
+        "screensaverSlideLabel": "Visa varje foto i",
+        "screensaverSlideHint": "Hur länge varje foto visas innan nästa kommer. Gäller bara den här enheten.",
         "screensaverClockLabel": "Visa klockan på skärmsläckaren",
         "screensaverClockHint": "Aktuell tid, i hörnet mittemot fotots bildtext. Gäller bara den här enheten.",
         "screensaverCoverLabel": "Fyll skärmen med fotot",

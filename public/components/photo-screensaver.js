@@ -2,6 +2,7 @@ import { api } from '/api.js';
 import { formatTime } from '/i18n.js';
 import { dateText } from '/utils/date-format.js';
 import {
+  getScreensaverSlideSeconds,
   isScreensaverClockOn,
   isScreensaverCoverOn,
   syncScreensaverIdleFromStorage,
@@ -20,7 +21,6 @@ const STYLE = '/styles/screensaver.css';
 function idleMs() {
   return Math.max(30, Number.parseInt(document.documentElement.dataset.screensaverIdle || '300', 10) || 300) * 1000;
 }
-const SLIDE_MS = 20_000;
 
 let idleTimer;
 let slideTimer;
@@ -121,8 +121,8 @@ async function start() {
     overlay = document.createElement('div');
     overlay.className = 'photo-screensaver';
     overlay.setAttribute('aria-hidden', 'true');
-    // Both read per start, not once at load: they are this device's choice
-    // (#1766) and apply from the next start on, without a reload.
+    // All three read per start, not once at load: they are this device's
+    // choice (#1766) and apply from the next start on, without a reload.
     if (isScreensaverCoverOn()) overlay.classList.add('photo-screensaver--cover');
     const image = document.createElement('img');
     image.alt = '';
@@ -176,7 +176,7 @@ async function start() {
       if (clock) clock.dataset.position = String((index + 2) % 4);
     };
     show();
-    slideTimer = setInterval(show, SLIDE_MS);
+    slideTimer = setInterval(show, getScreensaverSlideSeconds() * 1000);
     return true;
   } catch {
     // Screensaver is optional; try again after one more idle period, without

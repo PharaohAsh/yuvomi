@@ -2345,6 +2345,8 @@
         "screensaverIdleLabel": "Czas bezczynności przed uruchomieniem wygaszacza",
         "screensaverIdleHint": "Jak długo to urządzenie pozostaje nietknięte, zanim uruchomi się wygaszacz ze zdjęciami. Dotyczy tylko tego urządzenia, nie reszty gospodarstwa domowego. Działa, gdy administrator połączy Immich.",
         "screensaverIdleSaved": "Czas oczekiwania wygaszacza na tym urządzeniu: {{delay}}.",
+        "screensaverSlideLabel": "Pokazuj każde zdjęcie przez",
+        "screensaverSlideHint": "Jak długo każde zdjęcie pozostaje na ekranie przed następnym. Dotyczy tylko tego urządzenia.",
         "screensaverClockLabel": "Pokazuj godzinę na wygaszaczu",
         "screensaverClockHint": "Aktualna godzina w rogu naprzeciwko podpisu zdjęcia. Dotyczy tylko tego urządzenia.",
         "screensaverCoverLabel": "Zdjęcie na cały ekran",

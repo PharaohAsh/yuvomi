@@ -2163,6 +2163,8 @@
         "screensaverIdleLabel": "Simulan ang screensaver pagkalipas ng",
         "screensaverIdleHint": "Gaano katagal hindi gagalawin ang device na ito bago magsimula ang photo screensaver. Para lang sa device na ito, hindi sa iba pang bahagi ng sambahayan. Magkakabisa kapag naikonekta na ng admin ang Immich.",
         "screensaverIdleSaved": "Paghihintay ng screensaver sa device na ito: {{delay}}.",
+        "screensaverSlideLabel": "Ipakita ang bawat larawan nang",
+        "screensaverSlideHint": "Gaano katagal mananatili sa screen ang bawat larawan bago ang susunod. Para lang sa device na ito.",
         "screensaverClockLabel": "Ipakita ang oras sa screensaver",
         "screensaverClockHint": "Ang kasalukuyang oras, sa sulok na katapat ng caption ng larawan. Para lang sa device na ito.",
         "screensaverCoverLabel": "Punuin ng larawan ang screen",

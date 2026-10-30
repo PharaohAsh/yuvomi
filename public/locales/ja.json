@@ -2008,6 +2008,8 @@
         "screensaverIdleLabel": "スクリーンセーバーを開始するまで",
         "screensaverIdleHint": "写真スクリーンセーバーが始まるまで、このデバイスに触れない状態が続く時間です。このデバイスにのみ適用され、世帯の他のデバイスには影響しません。管理者が Immich を接続すると有効になります。",
         "screensaverIdleSaved": "このデバイスのスクリーンセーバー待ち時間: {{delay}}",
+        "screensaverSlideLabel": "1枚あたりの表示時間",
+        "screensaverSlideHint": "次の写真に切り替わるまで、各写真を画面に表示する時間です。このデバイスにのみ適用されます。",
         "screensaverClockLabel": "スクリーンセーバーに時刻を表示",
         "screensaverClockHint": "現在時刻を、写真のキャプションと反対側の隅に表示します。このデバイスにのみ適用されます。",
         "screensaverCoverLabel": "写真を画面いっぱいに表示",

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Choose how long each screensaver photo stays on screen.** Settings → This device → **Show each
+  photo for**: 10, 20 or 30 seconds, or 1, 2 or 5 minutes. Twenty seconds stays the default. Like the
+  delay before the screensaver starts, it is stored on each device, so a slow photo frame in the
+  hallway and a quicker kitchen tablet keep their own pace.
+
 ### Fixed
 - **Running the web installer again keeps your settings.** On an existing installation the advanced
   setup now fills its fields with the values from your `.env` - port, public address, reverse-proxy

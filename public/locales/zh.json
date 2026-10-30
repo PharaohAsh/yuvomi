@@ -2008,6 +2008,8 @@
         "screensaverIdleLabel": "屏幕保护程序启动前等待",
         "screensaverIdleHint": "本设备在无人触碰多久后启动照片屏幕保护程序。仅适用于本设备，不影响家庭中的其他设备。管理员连接 Immich 后生效。",
         "screensaverIdleSaved": "此设备的屏幕保护等待时间：{{delay}}",
+        "screensaverSlideLabel": "每张照片显示",
+        "screensaverSlideHint": "每张照片在切换到下一张前停留在屏幕上的时间。仅适用于此设备。",
         "screensaverClockLabel": "在屏幕保护上显示时间",
         "screensaverClockHint": "当前时间，显示在照片说明的对角。仅适用于此设备。",
         "screensaverCoverLabel": "照片铺满屏幕",

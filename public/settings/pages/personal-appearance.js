@@ -18,12 +18,15 @@ import { isWallModeEnabled, setWallModeEnabled } from '/utils/wall-mode.js';
 import { getNightHours, setNightHours } from '/utils/night-hours.js';
 import {
   SCREENSAVER_IDLE_STEPS,
+  SCREENSAVER_SLIDE_STEPS,
   getScreensaverIdleSeconds,
+  getScreensaverSlideSeconds,
   isScreensaverClockOn,
   isScreensaverCoverOn,
   setScreensaverClockOn,
   setScreensaverCoverOn,
   setScreensaverIdleSeconds,
+  setScreensaverSlideSeconds,
 } from '/utils/screensaver-idle.js';
 import { setDisplayTimeZone } from '/utils/timezone.js';
 import { adoptZone, zoneHintEl, zoneMismatch } from '/utils/household-zone-hint.js';
@@ -362,6 +365,32 @@ export function screensaverIdleOptions() {
   const current = getScreensaverIdleSeconds();
   return SCREENSAVER_IDLE_STEPS.map((seconds) => `
     <option value="${seconds}"${seconds === current ? ' selected' : ''}>${esc(screensaverIdleText(seconds))}</option>`).join('');
+}
+
+// Seconds below a minute, minutes from there, in the UI language like the delay.
+function screensaverSlideText(seconds) {
+  return seconds < 60
+    ? formatUnit(seconds, 'second', { unitDisplay: 'long' })
+    : formatUnit(seconds / 60, 'minute', { unitDisplay: 'long' });
+}
+
+// Exported so test:screensaver-device can check the select opens on the stored
+// value.
+export function screensaverSlideOptions() {
+  const current = getScreensaverSlideSeconds();
+  return SCREENSAVER_SLIDE_STEPS.map((seconds) => `
+    <option value="${seconds}"${seconds === current ? ' selected' : ''}>${esc(screensaverSlideText(seconds))}</option>`).join('');
+}
+
+/**
+ * Time per photo: read at the next start like the switches below, so the same
+ * toast. Exported so test:screensaver-device can drive the real handler.
+ */
+export function bindScreensaverSlideSelect(select) {
+  select?.addEventListener('change', () => {
+    setScreensaverSlideSeconds(Number(select.value));
+    window.yuvomi?.showToast(t('settings.screensaverDeviceSaved'), 'success');
+  });
 }
 
 /**
@@ -835,6 +864,15 @@ function deviceDisplayRowsHtml({ screensaverOn = true, isAdmin = false } = {}) {
             ${screensaverIdleOptions()}
           </select>`,
         })}
+        ${settingRowHtml({
+          label: t('settings.screensaverSlideLabel'),
+          labelFor: 'screensaver-slide-select',
+          description: t('settings.screensaverSlideHint'),
+          descriptionId: 'screensaver-slide-hint',
+          control: `<select class="form-input" id="screensaver-slide-select" aria-describedby="screensaver-slide-hint">
+            ${screensaverSlideOptions()}
+          </select>`,
+        })}
         <!-- What the screensaver shows, on this device too (#1766). -->
         ${settingSwitchRowHtml({
           label: t('settings.screensaverClockLabel'),
@@ -921,6 +959,7 @@ function bindDeviceDisplay(container) {
 
   bindNightHoursSelects(container.querySelector('#night-hours-from'), container.querySelector('#night-hours-until'));
   bindScreensaverIdleSelect(container.querySelector('#screensaver-idle-select'));
+  bindScreensaverSlideSelect(container.querySelector('#screensaver-slide-select'));
   bindScreensaverSwitch(container.querySelector('#screensaver-clock-toggle'), setScreensaverClockOn);
   bindScreensaverSwitch(container.querySelector('#screensaver-cover-toggle'), setScreensaverCoverOn);
 

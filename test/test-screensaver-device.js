@@ -328,6 +328,39 @@ test('the switches under Appearance store the choice and confirm it', async () =
   assert.match(registry, /'settings\.screensaverCoverLabel'/);
 });
 
+test('the time per photo is stored on this device and read at every start', async () => {
+  await page();
+  const { bindScreensaverSlideSelect, screensaverSlideOptions } = await import('../public/settings/pages/personal-appearance.js');
+  assert.equal(prefs.getScreensaverSlideSeconds(), 20, 'twenty seconds on a device that never chose');
+  assert.match(screensaverSlideOptions(), /value="20" selected/);
+
+  toasts.length = 0;
+  const select = { value: '60', handlers: {}, addEventListener(name, handler) { this.handlers[name] = handler; } };
+  bindScreensaverSlideSelect(select);
+  select.handlers.change();
+  assert.equal(pageStorage.getItem(prefs.SCREENSAVER_SLIDE_KEY), '60');
+  assert.deepEqual(toasts.map((toast) => toast.message), ['settings.screensaverDeviceSaved']);
+  assert.match(screensaverSlideOptions(), /value="60" selected/);
+
+  const node = await openScreensaver();
+  const first = caption(node).dataset.position;
+  mock.timers.tick(59_999);
+  assert.equal(caption(node).dataset.position, first, 'not before the chosen minute');
+  mock.timers.tick(1);
+  assert.notEqual(caption(node).dataset.position, first, 'the next photo after one minute');
+  gesture();
+
+  assert.equal(prefs.setScreensaverSlideSeconds(7), 20, 'a value that is not a step falls back to the default');
+  assert.equal(pageStorage.map.has(prefs.SCREENSAVER_SLIDE_KEY), false, 'the default is stored as no key');
+  pageStorage.setItem(prefs.SCREENSAVER_SLIDE_KEY, 'fast');
+  assert.equal(prefs.getScreensaverSlideSeconds(), 20, 'a hand-edited value reads as the default');
+  pageStorage.removeItem(prefs.SCREENSAVER_SLIDE_KEY);
+
+  const appearance = read('../public/settings/pages/personal-appearance.js');
+  assert.match(appearance, /bindScreensaverSlideSelect\(container\.querySelector\('#screensaver-slide-select'\)\)/);
+  assert.match(read('../public/settings/registry.js'), /'settings\.screensaverSlideLabel'/);
+});
+
 test('positions two apart are opposite corners in the stylesheet', () => {
   // The component puts the clock at (caption + 2) % 4. Whether that is really
   // the opposite corner is decided here, in the four caption rules.

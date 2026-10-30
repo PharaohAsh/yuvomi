@@ -2118,6 +2118,8 @@
         "screensaverIdleLabel": "Start skjermsparer etter",
         "screensaverIdleHint": "Hvor lenge denne enheten står urørt før fotoskjermspareren starter. Gjelder bare denne enheten, ikke resten av husstanden. Trer i kraft når en administrator har koblet til Immich.",
         "screensaverIdleSaved": "Ventetid for skjermsparer på denne enheten: {{delay}}.",
+        "screensaverSlideLabel": "Vis hvert bilde i",
+        "screensaverSlideHint": "Hvor lenge hvert bilde vises før det neste. Gjelder bare denne enheten.",
         "screensaverClockLabel": "Vis klokken på skjermspareren",
         "screensaverClockHint": "Gjeldende tid, i hjørnet overfor bildeteksten. Gjelder bare denne enheten.",
         "screensaverCoverLabel": "Bildet fyller skjermen",

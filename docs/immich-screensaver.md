@@ -3,7 +3,7 @@
 Yuvomi can replace the dashboard with photos from an [Immich](https://immich.app/) server after
 a period without keyboard, pointer, touch, or scroll activity - five minutes unless the device
 chooses otherwise (see [Delay on each device](#delay-on-each-device)). It requests a random set of
-photos, changes the photo every 20 seconds, and returns to Yuvomi on the next interaction. Photo
+photos, changes the photo every 20 seconds unless the device chooses otherwise, and returns to Yuvomi on the next interaction. Photo
 metadata moves between corners so that the screensaver does not introduce another fixed bright
 area. If Immich is unavailable, Yuvomi leaves the current screen visible and tries again after a
 later idle period.
@@ -60,8 +60,9 @@ variable for it: one value for the whole household would reach every signed-in d
 
 ## Clock and full-screen photos
 
-Two more choices sit right below the delay, and they are per device for the same reason:
+More choices sit right below the delay, and they are per device for the same reason:
 
+- **Show each photo for** - 10, 20 or 30 seconds, 1, 2 or 5 minutes, 20 seconds by default.
 - **Show the time on the screensaver** - on by default. The current time, in the household's time
   format and zone, in the corner diagonally opposite the photo caption. It moves with the caption
   and turns on the full minute.
@@ -69,7 +70,7 @@ Two more choices sit right below the delay, and they are per device for the same
   fitting inside it, so the edges are cropped, most of all on a portrait photo shown on a landscape
   screen.
 
-Both apply the next time the screensaver starts, without a reload.
+All three apply the next time the screensaver starts, without a reload.
 
 ## Configure through environment variables
 
