@@ -142,3 +142,35 @@ export function setScreensaverCoverOn(on) {
   writeFlag(SCREENSAVER_COVER_KEY, on ? '1' : null);
   return Boolean(on);
 }
+
+// --------------------------------------------------------
+// How long each photo stays on this device
+// --------------------------------------------------------
+//
+// Device-local like the rest: a photo frame in the hallway may want a slow
+// minute per photo, a kitchen tablet a quick turn. Read at every start like
+// the two flags above, so nothing has to exist in theme-init.js.
+
+export const SCREENSAVER_SLIDE_KEY = 'yuvomi-screensaver-slide';
+
+/** The choices offered, in seconds. */
+export const SCREENSAVER_SLIDE_STEPS = [10, 20, 30, 60, 120, 300];
+
+/** Unchanged from before the setting existed: twenty seconds. */
+export const SCREENSAVER_SLIDE_DEFAULT = 20;
+
+/** The time per photo chosen on THIS device, in seconds; anything else is the default. */
+export function getScreensaverSlideSeconds() {
+  const seconds = Number(readFlag(SCREENSAVER_SLIDE_KEY));
+  return SCREENSAVER_SLIDE_STEPS.includes(seconds) ? seconds : SCREENSAVER_SLIDE_DEFAULT;
+}
+
+/**
+ * @param {number} value seconds, one of SCREENSAVER_SLIDE_STEPS
+ * @returns {number} the seconds stored, the default for anything else
+ */
+export function setScreensaverSlideSeconds(value) {
+  const seconds = SCREENSAVER_SLIDE_STEPS.includes(Number(value)) ? Number(value) : SCREENSAVER_SLIDE_DEFAULT;
+  writeFlag(SCREENSAVER_SLIDE_KEY, seconds === SCREENSAVER_SLIDE_DEFAULT ? null : String(seconds));
+  return seconds;
+}

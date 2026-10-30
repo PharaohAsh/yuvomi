@@ -2118,6 +2118,8 @@
         "screensaverIdleLabel": "Képernyővédő indítása ennyi idő után",
         "screensaverIdleHint": "Ennyi ideig marad érintés nélkül ez az eszköz, mielőtt elindul a fényképes képernyővédő. Csak erre az eszközre vonatkozik, a háztartás többi tagjára nem. Akkor lép érvénybe, ha egy adminisztrátor csatlakoztatta az Immich-et.",
         "screensaverIdleSaved": "Képernyővédő várakozási ideje ezen az eszközön: {{delay}}.",
+        "screensaverSlideLabel": "Egy fotó megjelenítési ideje",
+        "screensaverSlideHint": "Mennyi ideig marad egy fotó a képernyőn, mielőtt a következő jön. Csak erre az eszközre vonatkozik.",
         "screensaverClockLabel": "Idő megjelenítése a képernyővédőn",
         "screensaverClockHint": "Az aktuális idő, a fotó feliratával szemközti sarokban. Csak erre az eszközre vonatkozik.",
         "screensaverCoverLabel": "A fotó kitölti a képernyőt",

@@ -2008,6 +2008,8 @@
         "screensaverIdleLabel": "螢幕保護程式啟動前等待",
         "screensaverIdleHint": "本裝置在無人觸碰多久後啟動照片螢幕保護程式。僅適用於本裝置，不影響家庭中的其他裝置。管理員連線 Immich 後生效。",
         "screensaverIdleSaved": "此裝置的螢幕保護等待時間：{{delay}}",
+        "screensaverSlideLabel": "每張照片顯示",
+        "screensaverSlideHint": "每張照片在切換到下一張前停留在螢幕上的時間。僅套用於此裝置。",
         "screensaverClockLabel": "在螢幕保護上顯示時間",
         "screensaverClockHint": "目前時間，顯示在照片說明的對角。僅適用於此裝置。",
         "screensaverCoverLabel": "照片填滿螢幕",

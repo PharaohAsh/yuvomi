@@ -2008,6 +2008,8 @@
         "screensaverIdleLabel": "Iniciar el salvapantallas tras",
         "screensaverIdleHint": "Cuánto tiempo permanece este dispositivo sin tocar antes de que se inicie el salvapantallas de fotos. Solo se aplica a este dispositivo, no al resto del hogar. Surte efecto cuando un administrador haya conectado Immich.",
         "screensaverIdleSaved": "Espera del salvapantallas en este dispositivo: {{delay}}.",
+        "screensaverSlideLabel": "Mostrar cada foto durante",
+        "screensaverSlideHint": "Cuánto tiempo permanece cada foto en pantalla antes de la siguiente. Solo se aplica a este dispositivo.",
         "screensaverClockLabel": "Mostrar la hora en el salvapantallas",
         "screensaverClockHint": "La hora actual, en la esquina opuesta al pie de foto. Solo se aplica a este dispositivo.",
         "screensaverCoverLabel": "Llenar la pantalla con la foto",

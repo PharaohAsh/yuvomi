@@ -2163,6 +2163,8 @@
         "screensaverIdleLabel": "화면 보호기 시작까지",
         "screensaverIdleHint": "사진 화면 보호기가 시작되기 전까지 이 기기를 만지지 않은 상태로 두는 시간입니다. 이 기기에만 적용되며 가족의 다른 기기에는 적용되지 않습니다. 관리자가 Immich를 연결하면 적용됩니다.",
         "screensaverIdleSaved": "이 기기의 화면 보호기 대기 시간: {{delay}}",
+        "screensaverSlideLabel": "사진당 표시 시간",
+        "screensaverSlideHint": "다음 사진으로 넘어가기 전에 각 사진이 화면에 머무는 시간입니다. 이 기기에만 적용됩니다.",
         "screensaverClockLabel": "화면 보호기에 시간 표시",
         "screensaverClockHint": "현재 시간을 사진 설명의 반대쪽 모서리에 표시합니다. 이 기기에만 적용됩니다.",
         "screensaverCoverLabel": "사진으로 화면 채우기",

@@ -2118,6 +2118,8 @@
         "screensaverIdleLabel": "Schermbeveiliging starten na",
         "screensaverIdleHint": "Hoe lang dit apparaat onaangeroerd blijft voordat de fotoschermbeveiliging start. Geldt alleen voor dit apparaat, niet voor de rest van het huishouden. Werkt zodra een beheerder Immich heeft gekoppeld.",
         "screensaverIdleSaved": "Wachttijd schermbeveiliging op dit apparaat: {{delay}}.",
+        "screensaverSlideLabel": "Elke foto tonen gedurende",
+        "screensaverSlideHint": "Hoe lang elke foto in beeld blijft voordat de volgende komt. Geldt alleen voor dit apparaat.",
         "screensaverClockLabel": "Tijd tonen op de schermbeveiliging",
         "screensaverClockHint": "De huidige tijd, in de hoek tegenover het fotobijschrift. Geldt alleen voor dit apparaat.",
         "screensaverCoverLabel": "Foto vult het scherm",

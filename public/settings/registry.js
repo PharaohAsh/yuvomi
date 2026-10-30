@@ -178,6 +178,7 @@ export const SETTINGS_SECTIONS = freezeEntries([
       { key: 'settings.wallModeLabel', synonyms: 'settingsSynonyms.wallMode' },
       'settings.nightHoursLabel',
       'settings.screensaverIdleLabel',
+      'settings.screensaverSlideLabel',
       'settings.screensaverClockLabel',
       'settings.screensaverCoverLabel',
     ],

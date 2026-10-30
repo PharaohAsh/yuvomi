@@ -2163,6 +2163,8 @@
         "screensaverIdleLabel": "Bildschirmschoner starten nach",
         "screensaverIdleHint": "So lange bleibt dieses Gerät unberührt, bevor der Foto-Bildschirmschoner startet. Gilt nur hier, nicht für die anderen Geräte im Haushalt. Wirkt erst, wenn ein Admin Immich verbunden hat.",
         "screensaverIdleSaved": "Wartezeit des Bildschirmschoners auf diesem Gerät: {{delay}}.",
+        "screensaverSlideLabel": "Jedes Foto zeigen für",
+        "screensaverSlideHint": "Wie lange ein Foto zu sehen ist, bevor das nächste kommt. Gilt nur für dieses Gerät.",
         "screensaverClockLabel": "Uhrzeit im Bildschirmschoner anzeigen",
         "screensaverClockHint": "Die aktuelle Uhrzeit, in der Ecke gegenüber der Fotobeschriftung. Gilt nur für dieses Gerät.",
         "screensaverCoverLabel": "Foto füllt den Bildschirm",

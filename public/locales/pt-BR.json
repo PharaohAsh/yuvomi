@@ -2008,6 +2008,8 @@
         "screensaverIdleLabel": "Iniciar o protetor de tela após",
         "screensaverIdleHint": "Quanto tempo este dispositivo fica sem toque antes de o protetor de tela de fotos começar. Vale apenas para este dispositivo, não para o restante da casa. Passa a valer quando um administrador conectar o Immich.",
         "screensaverIdleSaved": "Espera do protetor de tela neste dispositivo: {{delay}}.",
+        "screensaverSlideLabel": "Mostrar cada foto por",
+        "screensaverSlideHint": "Quanto tempo cada foto fica na tela antes da próxima. Vale apenas para este dispositivo.",
         "screensaverClockLabel": "Mostrar a hora no protetor de tela",
         "screensaverClockHint": "A hora atual, no canto oposto à legenda da foto. Vale apenas para este dispositivo.",
         "screensaverCoverLabel": "Preencher a tela com a foto",

@@ -2163,6 +2163,8 @@
         "screensaverIdleLabel": "Mulai screensaver setelah",
         "screensaverIdleHint": "Berapa lama perangkat ini tidak disentuh sebelum screensaver foto dimulai. Hanya berlaku untuk perangkat ini, bukan untuk anggota rumah tangga lainnya. Berlaku setelah admin menghubungkan Immich.",
         "screensaverIdleSaved": "Jeda screensaver di perangkat ini: {{delay}}.",
+        "screensaverSlideLabel": "Tampilkan setiap foto selama",
+        "screensaverSlideHint": "Berapa lama setiap foto tampil di layar sebelum foto berikutnya. Hanya berlaku untuk perangkat ini.",
         "screensaverClockLabel": "Tampilkan jam di screensaver",
         "screensaverClockHint": "Waktu saat ini, di sudut yang berseberangan dengan keterangan foto. Hanya berlaku untuk perangkat ini.",
         "screensaverCoverLabel": "Foto memenuhi layar",

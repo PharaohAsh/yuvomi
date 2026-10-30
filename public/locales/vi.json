@@ -2118,6 +2118,8 @@
         "screensaverIdleLabel": "Bắt đầu trình bảo vệ màn hình sau",
         "screensaverIdleHint": "Thời gian thiết bị này không được chạm vào trước khi trình bảo vệ màn hình ảnh bắt đầu. Chỉ áp dụng cho thiết bị này, không áp dụng cho các thiết bị khác trong gia đình. Có hiệu lực khi quản trị viên đã kết nối Immich.",
         "screensaverIdleSaved": "Thời gian chờ trình bảo vệ màn hình trên thiết bị này: {{delay}}.",
+        "screensaverSlideLabel": "Hiển thị mỗi ảnh trong",
+        "screensaverSlideHint": "Thời gian mỗi ảnh ở trên màn hình trước khi chuyển sang ảnh tiếp theo. Chỉ áp dụng cho thiết bị này.",
         "screensaverClockLabel": "Hiển thị giờ trên trình bảo vệ màn hình",
         "screensaverClockHint": "Giờ hiện tại, ở góc đối diện với chú thích ảnh. Chỉ áp dụng cho thiết bị này.",
         "screensaverCoverLabel": "Ảnh lấp đầy màn hình",
