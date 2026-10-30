@@ -21,7 +21,7 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const APP_RELEASE        = '2.82.0';
+const APP_RELEASE        = '2.83.0';
 const APP_BUILD_REVISION = '__YUVOMI_BUILD_REVISION__';
 const CACHE_RELEASE      = `${APP_RELEASE}-${APP_BUILD_REVISION}`;
 const SHELL_CACHE        = `yuvomi-shell-${CACHE_RELEASE}`;
@@ -365,6 +365,10 @@ const APP_SHELL = [
   '/utils/list-motion.js',
   '/utils/component-style.js',
   '/utils/content-swap.js',
+  '/utils/color-picker.js',
+  '/utils/interval-sentence.js',
+  '/utils/hint-fold.js',
+  '/utils/media-picker.js',
   '/utils/filter-sheet.js',
   '/utils/folder-upload.js',
   '/utils/folder-tree.js',
@@ -417,6 +421,7 @@ const APP_SHELL = [
   '/utils/money.js',
   '/utils/amount-field.js',
   '/utils/nav-badges.js',
+  '/utils/sidebar-pinned.js',
   '/utils/note-access.js',
   '/utils/note-category-filter.js',
   '/utils/note-category-name.js',
@@ -453,8 +458,10 @@ const APP_SHELL = [
   '/utils/roving-toolbar.js',
   '/utils/row-action.js',
   '/utils/row-fill.js',
+  '/utils/scale-quantity.js',
   '/utils/schedule-tabs.js',
   '/utils/schedule-reminder-offset.js',
+  '/utils/servings-stepper.js',
   '/utils/screensaver-idle.js',
   '/utils/scroll-restore.js',
   '/utils/seal-pair.js',
@@ -482,6 +489,7 @@ const APP_SHELL = [
   '/utils/unknown-route.js',
   '/utils/page-mount.js',
   '/utils/ux.js',
+  '/utils/sidebar-glide.js',
   '/utils/vcard.js',
   '/utils/view-transition.js',
   '/utils/version.js',

@@ -16,9 +16,10 @@ import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
 import { emptyHintEl, emptyStateEl } from '/utils/empty-state.js';
 import { wireScrollFade, wireCollapsingHeader, watchNavCapsuleHeight, bindNavMinimize } from '/utils/ux.js';
+import { glideSidebar } from '/utils/sidebar-glide.js';
 import { TOAST_SURFACES } from '/utils/toast-surface.js';
 import { inertOutside } from '/utils/background-inert.js';
-import { showToast, endFeedbackToasts } from '/utils/toast-show.js';
+import { showToast, endModuleFeedback, feedbackScope } from '/utils/toast-show.js';
 import { unknownPathDetour, publicPathDetour, detourPaths } from '/utils/unknown-route.js';
 import { createNavigate, prefetchPathOf, focusMainAfterNavigation, unlessAborted, isCurrentAddress } from '/utils/router-navigate.js';
 import { pageMountTarget } from '/utils/page-mount.js';
@@ -39,6 +40,7 @@ import { brandMarkSvg } from '/utils/brand-mark.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
 import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
+import { localizeBirthdayEvent } from '/utils/birthday-event.js';
 import {
   SEARCH_SECTIONS, NEW_ACTIONS, searchResultCount, markSegments, paletteCommands, paletteStatusText,
   readRecent, rememberRecent, visibleRecent, forgetAllRecent, RECENT_MAX,
@@ -78,6 +80,7 @@ import {
 import { openModal, confirmModal, closeModal } from '/components/modal.js';
 import { armScreensaver, disarmScreensaver } from '/components/photo-screensaver.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
+import { placeSidebarNavItems, splitPinnedNavItems } from '/utils/sidebar-pinned.js';
 import { prefersInkText } from '/utils/contrast.js';
 import { handleMasterDetailPopstate } from '/utils/master-detail.js';
 import '/components/datepicker.js';
@@ -141,6 +144,9 @@ const ROUTES = [
   { path: '/housekeeping', page: '/pages/housekeeping.js', requiresAuth: true, module: 'housekeeping', titleKey: 'nav.housekeeping' },
   { path: '/waste', page: '/pages/waste.js', requiresAuth: true, module: 'waste', titleKey: 'nav.waste' },
   { path: '/rewards',  page: '/pages/rewards.js',    requiresAuth: true, module: 'rewards',   titleKey: 'nav.rewards' },
+  // Der Verlauf der Belohnungen ist ein Ort (R24 S8-F1): eigene Adresse, dieselbe
+  // Seite, dasselbe Modul - Zurueck, Neuladen und Link landen im Verlauf.
+  { path: '/rewards/history', page: '/pages/rewards.js', requiresAuth: true, module: 'rewards', titleKey: 'nav.rewards' },
 ];
 
 // Settings ist eine Sektion mit einer Wurzel und je einer exakten Route pro
@@ -370,9 +376,15 @@ function navigationIdle() {
  * Als WeakRef: ein abgehaengter Port der Vorseite bleibt nicht im Speicher.
  */
 let _lastContentPort = null;
+// NUR DER KNOTEN, KEINE MESSUNG (Critique R24 G3-Quer-P2-2): `scrollTop` hier
+// zu lesen verlangte je Scroll-Ereignis ein aktuelles Layout - nach jedem
+// Klassenwechsel eines anderen Lauschers (Kapsel minimiert, Kopf faltet) als
+// erzwungenes Layout gemessen (`router.js:onscroll` 40 ms im Vorrat, 4x CPU).
+// Ob der Port oben steht, fragt scrollPageToTop() erst beim Tipp.
 document.addEventListener('scroll', (e) => {
   const port = e.target;
-  if (port instanceof Element && port.scrollTop > 0 && port.closest('#main-content')) {
+  if (!(port instanceof Element) || port === _lastContentPort?.deref?.()) return;
+  if (port.closest('#main-content')) {
     _lastContentPort = typeof WeakRef === 'function' ? new WeakRef(port) : null;
   }
 }, { capture: true, passive: true });
@@ -684,6 +696,8 @@ function topLevelSection(path) {
   // startsWith('/schedule') traefe auch einen hypothetischen kuenftigen Pfad
   // wie '/schedules...', der zu keinem echten Schedule-Tab gehoert.
   if (typeof path === 'string' && (path === '/schedule' || path.startsWith('/schedule/'))) return '/schedule';
+  // Der Verlauf der Belohnungen (R24 S8-F1) markiert "Belohnungen".
+  if (path === '/rewards/history') return '/rewards';
   return path ?? '/';
 }
 
@@ -1920,8 +1934,10 @@ async function renderPage(route, previousPath = null, scrollTarget = 0, { signal
       // DIE RUECKMELDUNG ENDET MIT IHREM MODUL (Critique R22, D18): der Toast
       // "Aufgabe erledigt - Rueckgaengig" wanderte in den Einkauf mit (a2,
       // Casey). Ihre Handlung gilt (utils/toast-show.js); zwischen den Reitern
-      // der Kueche bleibt sie - die Kueche ist EIN Modul der Navigation.
-      if (moduleSectionOf(previousPath) !== moduleSectionOf(route.path)) endFeedbackToasts();
+      // der Kueche bleibt sie - die Kueche ist EIN Modul der Navigation. Seit
+      // R24 (G0-Shell-P1-2) auch die, die erst NACH dem Wechsel kaeme: der
+      // Wechsel macht jede vorher genommene Modul-Marke alt (feedbackScope).
+      if (moduleSectionOf(previousPath) !== moduleSectionOf(route.path)) endModuleFeedback();
       style.cleanup();
       // Lebenszyklus-Vertrag (#976): der Router besitzt EIN AbortController je
       // Seitenaufbau und bricht ihn hier ab, wo die Route ersetzt wird. Die
@@ -2163,16 +2179,19 @@ function renderAppShell(container) {
   sidebarToggle.addEventListener('click', (event) => {
     const nowCollapsed = !document.documentElement.classList.contains('sidebar-collapsed');
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, nowCollapsed ? '1' : '0');
-    applySidebarCollapsed(nowCollapsed);
-    if (event.detail > 0) {
-      document.documentElement.classList.toggle('sidebar-collapse-pointer-lock', nowCollapsed);
-    }
-    // Pointer clicks leave the toggle focused, which immediately re-expands the
-    // collapsed rail via .nav-sidebar:focus-within. Blur only for pointer-driven
-    // activation so keyboard users keep the expected focus behavior.
-    if (nowCollapsed && event.detail > 0) {
-      requestAnimationFrame(() => sidebarToggle.blur());
-    }
+    // Ein Layout, die Kanten gleiten per View Transition (utils/sidebar-glide.js).
+    // Zeigersperre und Blur gehoeren in denselben Wechsel: ohne sie hielten
+    // Hover-Ausklappen und `:focus-within` die Tafel im neuen Bild breit.
+    glideSidebar(() => {
+      applySidebarCollapsed(nowCollapsed);
+      if (event.detail > 0) {
+        document.documentElement.classList.toggle('sidebar-collapse-pointer-lock', nowCollapsed);
+      }
+      // Pointer clicks leave the toggle focused, which immediately re-expands the
+      // collapsed rail via .nav-sidebar:focus-within. Blur only for pointer-driven
+      // activation so keyboard users keep the expected focus behavior.
+      if (nowCollapsed && event.detail > 0) sidebarToggle.blur();
+    });
     const lbl = nowCollapsed ? t('nav.sidebarExpand') : t('nav.sidebarCollapse');
     sidebarToggle.setAttribute('aria-label', lbl);
     sidebarToggle.setAttribute('title', lbl);
@@ -2199,11 +2218,9 @@ function renderAppShell(container) {
   // Sidebar ist eine Flex-Spalte, und was nicht im Scroller liegt, scrollt
   // nicht weg. Strukturell ist das ohnehin der richtige Ort - die Einstellungen
   // sind Systemebene, kein Modul unter Modulen.
-  const pinnedSidebarItems = [];
-  sidebarNavItems().forEach((item) => {
-    if (item.classList?.contains('nav-item--pinned-end')) pinnedSidebarItems.push(item);
-    else sidebarItems.appendChild(item);
-  });
+  // Dieselbe Teilung wie im Neuaufbau (utils/sidebar-pinned.js, #2324).
+  const { listed: listedSidebarItems, pinned: pinnedSidebarItems } = splitPinnedNavItems(sidebarNavItems());
+  sidebarItems.append(...listedSidebarItems);
 
   // Scroll-Affordanz (Audit F-01): weiche Fade-Anrisse oben/unten, sobald die
   // Liste überläuft — der Scrollbalken ist bewusst versteckt, ohne Anriss waren
@@ -4200,7 +4217,7 @@ function renderSearchResults(container, data, onClose, { local = { places: [], a
   // `dateKey` ist der Kalendertag in der ANZEIGEZONE: der Termin-Treffer baut
   // daraus den Tag seines Links (#1607), und ein synchronisierter Termin liegt
   // als Instant in der Zeile - sein UTC-Tag waere der falsche.
-  const fmt = { dateText, formatTime, activityLabel, dateKey: zonedDateKey };
+  const fmt = { dateText, formatTime, activityLabel, dateKey: zonedDateKey, eventTitle: (item) => localizeBirthdayEvent(item).title };
   if (data) {
     SEARCH_SECTIONS.forEach((section) => {
       const hits = Array.isArray(data?.[section.bucket]) ? data[section.bucket] : [];
@@ -4787,9 +4804,20 @@ function placeNavIndicator(indicator, apply, instant = false) {
   if (first) indicator.style.transition = 'none';
   apply();
   if (!first) return;
-  indicator.getBoundingClientRect();
-  indicator.style.transition = '';
-  if (indicator.getClientRects().length) indicator.dataset.placed = '1';
+  // DER SPRUNG BRAUCHT KEIN SOFORTIGES LAYOUT (Critique R24 S12): damit
+  // `transition: none` gilt, genuegt EIN berechneter Stil mit dem neuen Wert -
+  // den rechnet das naechste Bild ohnehin. Bis dahin las hier
+  // `getBoundingClientRect()` und legte im Seitenwechsel die eben eingesetzte
+  // Zielseite ein zweites Mal aus (4x CPU ~17 ms in der Rueckkehr zur
+  // Uebersicht). Freigegeben wird nach dem gemalten Bild; markiert wird nur
+  // ein Indikator mit gezeichneter Box.
+  const token = (indicator._placeToken ?? 0) + 1;
+  indicator._placeToken = token;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (indicator._placeToken !== token) return;
+    indicator.style.transition = '';
+    if (indicator.checkVisibility ? indicator.checkVisibility() : indicator.getClientRects().length) indicator.dataset.placed = '1';
+  }));
 }
 
 /**
@@ -4890,6 +4918,51 @@ const TAB_INDICATOR_MAX_WIDTH = 64;
  * die Label-Grundlinie frei bleibt und die Kapsel weder in die Safe-Area noch
  * an die Bar-Kante läuft.
  */
+/* DIE LAGE DER PILLE HAENGT AN DER KAPSEL, NICHT AM INHALT (Critique R24
+ * S12, G0-Shell-P2-6). Im Seitenwechsel springt die Pille im Frame des neuen
+ * Inhalts (`instant`) - ihre Messung lief damit IN der View Transition, direkt
+ * nach dem Einsetzen der Zielseite, und legte diese ein zweites Mal aus
+ * (gemessen 17 ms bei 4x CPU in der Rueckkehr zur Uebersicht). Die Kapsel
+ * aendert sich dabei nicht. Gemerkt wird je Ziel die Lage relativ zur Kapsel,
+ * gueltig, solange Kapselgroesse (ResizeObserver, `_tabGeomEpoch`) und
+ * Kapselzustand (Klassen: minimiert, Rueckweg) gleich sind; gemessen wird sie
+ * spaetestens beim Druck auf das Ziel, wenn das Layout noch sauber ist
+ * (`warmTabGeometry`). */
+let _tabGeomEpoch = 0;
+const _tabGeom = new WeakMap();
+
+function tabGeometry(nav, active) {
+  const key = `${_tabGeomEpoch}|${nav.className}`;
+  const cached = _tabGeom.get(active);
+  if (cached?.key === key) return cached;
+  const nr = nav.getBoundingClientRect();
+  const ar = active.getBoundingClientRect();
+  const well = active.querySelector('.nav-item__icon-well');
+  const wr = well ? well.getBoundingClientRect() : ar;
+  const width = Math.max(
+    wr.width,
+    Math.min(ar.width - TAB_INDICATOR_INSET * 2, TAB_INDICATOR_MAX_WIDTH),
+  );
+  const geometry = {
+    key,
+    width,
+    height: wr.height,
+    // clientTop: der Indikator sitzt in der Padding-Box der Bar, das Rect an der
+    // Border-Kante - ohne den Abzug sitzt die Kapsel 1px zu tief.
+    top: wr.top - nr.top - nav.clientTop,
+    left: ar.left - nr.left + (ar.width - width) / 2,
+  };
+  _tabGeom.set(active, geometry);
+  return geometry;
+}
+
+/** Misst das gedrueckte Ziel, solange das Layout noch das der alten Seite ist. */
+function warmTabGeometry(event) {
+  const item = event.target?.closest?.('.nav-bottom__items .nav-item');
+  const nav = item?.closest('.nav-bottom');
+  if (item && nav && !isDesktopViewport()) tabGeometry(nav, item);
+}
+
 function positionTabIndicator(instant = false) {
   // Dasselbe umgekehrt: ab 1024px ist die Tab-Leiste verborgen (layout.css).
   if (isDesktopViewport()) return;
@@ -4903,21 +4976,10 @@ function positionTabIndicator(instant = false) {
     indicator.style.opacity = '0';
     return;
   }
-  const nr = nav.getBoundingClientRect();
-  const ar = active.getBoundingClientRect();
-  const well = active.querySelector('.nav-item__icon-well');
-  const wr = well ? well.getBoundingClientRect() : ar;
-  const width = Math.max(
-    wr.width,
-    Math.min(ar.width - TAB_INDICATOR_INSET * 2, TAB_INDICATOR_MAX_WIDTH),
-  );
-  // clientTop: der Indikator sitzt in der Padding-Box der Bar, das Rect an der
-  // Border-Kante - ohne den Abzug sitzt die Kapsel 1px zu tief.
-  const top = wr.top - nr.top - nav.clientTop;
-  const left = ar.left - nr.left + (ar.width - width) / 2;
+  const { width, height, top, left } = tabGeometry(nav, active);
   placeNavIndicator(indicator, () => {
     indicator.style.width = `${width}px`;
-    indicator.style.height = `${wr.height}px`;
+    indicator.style.height = `${height}px`;
     indicator.style.transform = `translate(${left}px, ${top}px)`;
     indicator.style.opacity = '';
   }, instant);
@@ -5408,9 +5470,13 @@ function rebuildNavigation({ updateLabels = true } = {}) {
     // Auto-Scroll unten riss sie sofort wieder zum aktiven Item — sichtbar als
     // Springen zwischen erstem und letztem Eintrag.
     const previousScrollTop = navSidebarItems.scrollTop;
-    const sidebarEls = sidebarNavItems();
-    navSidebarItems.replaceChildren(...sidebarEls);
-    if (window.lucide) window.lucide.createIcons({ el: navSidebarItems });
+    // Liste in den Scroller, Einstellungen dahinter - ueber denselben Helfer
+    // wie der Erstaufbau. Hier lag der gepinnte Eintrag einmal mit im
+    // Scroller, waehrend der alte daneben stehen blieb: „Einstellungen"
+    // zweimal nach jedem Modul-Schalter (#2324).
+    placeSidebarNavItems(navSidebarItems, sidebarNavItems());
+    // Die Spalte, nicht nur der Scroller: der gepinnte Eintrag steht daneben.
+    if (window.lucide) window.lucide.createIcons({ el: navSidebar ?? navSidebarItems });
     requestAnimationFrame(() => {
       navSidebarItems.scrollTop = Math.min(
         previousScrollTop,
@@ -5520,7 +5586,12 @@ function observeNavCapsule() {
   const items = document.querySelector('.nav-bottom__items');
   if (!items || items.dataset.indicatorObserved === '1') return;
   items.dataset.indicatorObserved = '1';
-  new ResizeObserver(() => requestAnimationFrame(() => positionTabIndicator())).observe(items);
+  new ResizeObserver(() => {
+    _tabGeomEpoch += 1;
+    requestAnimationFrame(() => positionTabIndicator());
+  }).observe(items);
+  // Die Lage des Ziels steht vor dem Tausch fest (tabGeometry).
+  items.addEventListener('pointerdown', warmTabGeometry, { capture: true, passive: true });
   // Dieselbe Kapsel, ihre HOEHE: umbrechende Labels machen sie hoeher als
   // --nav-height-mobile, und die Zone darunter muss mitwachsen (Review zu #1475).
   watchNavCapsuleHeight(items);
@@ -5572,8 +5643,14 @@ function isTextEntry(el) {
 function syncKeyboardVisible() {
   const focused = isTextEntry(document.activeElement);
   const vv = window.visualViewport;
+  // OHNE TIPPFELD NICHTS MESSEN (Critique R24 S12): `innerHeight` verlangt ein
+  // aktuelles Layout. Jeder Fokuswechsel im Seitenwechsel (der Tipp auf die
+  // Kapsel, das Wegraeumen der alten Seite) lief hier durch und legte die eben
+  // eingesetzte Zielseite ein zweites Mal aus - gemessen 23 ms bei 4x CPU in
+  // der Rueckkehr zur Uebersicht. Ohne Tippfeld ist die Antwort ohnehin "keine
+  // Tastatur"; der Viewport wird erst danach gefragt (Kurzschluss).
   // Ohne visualViewport trägt der Fokus die Entscheidung allein.
-  const shrunk = !vv || vv.height < window.innerHeight * 0.75;
+  const shrunk = focused && (!vv || vv.height < window.innerHeight * 0.75);
   document.body.classList.toggle('keyboard-visible', focused && shrunk);
 }
 
@@ -5709,6 +5786,9 @@ window.yuvomi = {
   // Seitenleiste, Mehr-Blatt und Cmd-K.
   openSearch: () => _openSearch?.(),
   showToast,
+  // Die Modul-Marke einer Quittung, die erst nach einer Anfrage kommt (R24,
+  // utils/toast-show.js): VOR dem `await` nehmen, als `{ scope }` reichen.
+  feedbackScope,
   setThemeColor,
   setDisabledModules,
   setHiddenModules,

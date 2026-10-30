@@ -374,7 +374,7 @@ test('M3: das Blatt traegt Zeitraum, Stepper, ein hohes Diagramm und die Messlis
     assert.equal(blatt.headerAction?.label, 'health.vitals.addShort', 'Erfassen steht im Kopf des Blatts');
 
     const html = health.vitalSheetMarkup(vitalMetric('weight'));
-    assert.match(html, /class="health-vitals__ranges health-vital-sheet__ranges" role="tablist"/);
+    assert.match(html, /class="segmented health-vitals__ranges health-vital-sheet__ranges" role="tablist"/, 'das Kanon-Segment (R24 G5 P2-6)');
     assert.deepEqual([...html.matchAll(/data-sheet-range="(\w+)"/g)].map((m) => m[1]), ['day', 'week', 'month', 'year'],
       'der Zeitraum-Umschalter steht IM Blatt');
     assert.match(html, /data-sheet-step="-1"[\s\S]*data-sheet-step="1"/);
@@ -814,6 +814,9 @@ test('R18: die Kennzahlkarte hat vier feste Zeilen - Kopf, Wert, Trendlinie, Met
   });
   // Farbe: Modulton mit Rueckfall, Flaeche laeuft auf 0, Endpunkt in Label-Farbe.
   assert.match(body('.metric-card__spark', plain), /color:\s*var\(--module-accent, var\(--color-text-secondary\)\)/);
+  // R24 S15: die Wurzel fuellt nicht. Ohne Angabe ist `fill` schwarz - Sonde 14
+  // las die Trendlinie der Uebersicht im Dark als #000 auf #37332E (1,68:1).
+  assert.match(body('.metric-card__spark', plain), /(?:^|;)\s*fill:\s*none\b/, 'das SVG traegt fill: none, die Tinte ist currentColor');
   assert.match(body('.metric-card__spark-to'), /stop-opacity:\s*0\b/);
   assert.match(body('.metric-card__spark-end'), /stroke:\s*var\(--color-text-primary\)/);
   // Grafikkontrast 3:1 der Linie gegen Karte und Well, beide Themes (Gesundheitston).
@@ -1029,13 +1032,13 @@ async function inUebersicht(fn, rows, { access = 'write' } = {}) {
   }
 }
 
-test('R21 D6: ohne Messung keine grauen Wells, sondern eine ruhige Zeile mit Erfassen', async () => {
+test('R21 D6 + R24 E9: ohne Messung keine grauen Wells, sondern eine ruhige Zeile - erfasst wird am FAB', async () => {
   await inUebersicht(() => {
     const html = health.overviewVitalsMarkup();
     assert.doesNotMatch(html, /metric-card__value--empty|metric-card/, 'keine Kachel ohne Wert');
     assert.match(html, /card-empty-row/, 'die geteilte ruhige Zeile (utils/empty-state.js)');
     assert.match(html, /health\.vitals\.emptyTitle/);
-    assert.match(html, /data-action="ov-add-vital"/, 'mit Schreibrecht der Weg zum Erfassen');
+    assert.doesNotMatch(html, /data-action="ov-add-vital"/, 'R24 E9: kein zweiter Erfassen-Weg neben dem FAB-Menue');
   }, []);
   await inUebersicht(() => {
     assert.doesNotMatch(health.overviewVitalsMarkup(), /data-action="ov-add-vital"/, 'ohne Schreibrecht nur die Zeile');
@@ -1224,4 +1227,80 @@ test('#1699: der Zeitraum-Umschalter beginnt mit "Tag"', async () => {
     const html = health.vitalSheetMarkup(vitalMetric('weight'));
     assert.deepEqual([...html.matchAll(/data-sheet-range="(\w+)"/g)].map((m) => m[1]), ['day', 'week', 'month', 'year']);
   });
+});
+
+// --------------------------------------------------------
+// #2328: Einheiten einer Messart vor jeder Rechnung angleichen
+// --------------------------------------------------------
+// Die API nimmt `unit` als freien Text. 95.400 g neben 95,4 kg zeichneten eine
+// Spitze bei 95400 und eine Aenderung von +95.304,7. Gespeichert bleibt, was
+// kam; die Serie rechnet alles in EINE Anzeige-Einheit um.
+
+test('#2328: Gramm und Kilogramm landen auf derselben Hoehe', () => {
+  const rows = [
+    { id: 1, type: 'weight', value_num: 95.6, unit: 'kg', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'weight', value_num: 95.4, unit: 'kg', measured_at: '2026-06-11T08:00' },
+    { id: 3, type: 'weight', value_num: 95400, unit: 'g', measured_at: '2026-06-12T08:00' },
+  ];
+  const s = computeVitalSeries(rows, { type: 'weight', range: 'month', anchor: '2026-06-15', today: '2026-06-15' });
+  assert.equal(s.unit, 'kg');
+  assert.equal(s.latest.unit, 'kg');
+  assert.equal(s.latest.value_num, 95.4);
+  assert.equal(s.deltas.value_num, 0);
+  const max = Math.max(...s.readings.map((r) => r.value_num));
+  assert.ok(max < 100, `hoechster Punkt ${max} statt rund 95`);
+  assert.ok(s.points.every((p) => p.max.value_num === null || p.max.value_num < 100));
+});
+
+test('#2328: die Anzeige-Einheit ist die haeufigste waehlbare', () => {
+  const rows = [
+    { id: 1, type: 'weight', value_num: 200, unit: 'lb', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'weight', value_num: 202, unit: 'lb', measured_at: '2026-06-11T08:00' },
+    { id: 3, type: 'weight', value_num: 91, unit: 'kg', measured_at: '2026-06-12T08:00' },
+  ];
+  const s = computeVitalSeries(rows, { type: 'weight', range: 'month', anchor: '2026-06-15', today: '2026-06-15' });
+  assert.equal(s.unit, 'lb');
+  assert.equal(s.latest.unit, 'lb');
+  assert.ok(Math.abs(s.latest.value_num - 200.62) < 0.01, String(s.latest.value_num));
+  // Nur Gramm erfasst: angezeigt wird trotzdem die erste waehlbare Einheit.
+  const g = computeVitalSeries([{ id: 9, type: 'weight', value_num: 3500, unit: 'g', measured_at: '2026-06-12T08:00' }],
+    { type: 'weight', range: 'month', anchor: '2026-06-15', today: '2026-06-15' });
+  assert.equal(g.latest.unit, 'kg');
+  assert.equal(g.latest.value_num, 3.5);
+});
+
+test('#2328: Laenge, Temperatur und Blutzucker rechnen genauso um', () => {
+  const opts = { range: 'month', anchor: '2026-06-15', today: '2026-06-15' };
+  const height = computeVitalSeries([
+    { id: 1, type: 'height', value_num: 180, unit: 'cm', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'height', value_num: 181, unit: 'cm', measured_at: '2026-06-11T08:00' },
+    { id: 3, type: 'height', value_num: 1.8, unit: 'm', measured_at: '2026-06-12T08:00' },
+  ], { type: 'height', ...opts });
+  assert.equal(height.latest.value_num, 180);
+  assert.equal(height.deltas.value_num, -1);
+  const temp = computeVitalSeries([
+    { id: 1, type: 'temp', value_num: 37, unit: '°C', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'temp', value_num: 37.5, unit: '°C', measured_at: '2026-06-11T08:00' },
+    { id: 3, type: 'temp', value_num: 98.6, unit: '°F', measured_at: '2026-06-12T08:00' },
+  ], { type: 'temp', ...opts });
+  assert.equal(temp.latest.unit, '°C');
+  assert.equal(temp.latest.value_num, 37);
+  const glucose = computeVitalSeries([
+    { id: 1, type: 'glucose', value_num: 90, unit: 'mg/dL', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'glucose', value_num: 100, unit: 'mg/dL', measured_at: '2026-06-11T08:00' },
+    { id: 3, type: 'glucose', value_num: 5, unit: 'mmol/L', measured_at: '2026-06-12T08:00' },
+  ], { type: 'glucose', ...opts });
+  assert.equal(glucose.latest.unit, 'mg/dL');
+  assert.ok(Math.abs(glucose.latest.value_num - 90.09) < 0.01, String(glucose.latest.value_num));
+});
+
+test('#2328: unbekannte oder fehlende Einheit bleibt unangetastet', () => {
+  const rows = [
+    { id: 1, type: 'weight', value_num: 15, unit: 'stone', measured_at: '2026-06-10T08:00' },
+    { id: 2, type: 'weight', value_num: 95, unit: null, measured_at: '2026-06-11T08:00' },
+  ];
+  const s = computeVitalSeries(rows, { type: 'weight', range: 'month', anchor: '2026-06-15', today: '2026-06-15' });
+  assert.equal(s.latest.value_num, 95);
+  assert.equal(s.previous.value_num, 15);
+  assert.equal(s.previous.unit, 'stone');
 });

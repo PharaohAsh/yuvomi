@@ -251,9 +251,9 @@ node tools/installer/install-server.js
 
 #### 3. Open the Wizard
 
-Open your browser and navigate to **http://localhost:8090**. The wizard detects your browser language (27 languages supported), verifies that a container engine is available (Docker with Compose v2, or Podman with `podman compose` / `podman-compose`), and reports an existing `.env` file as well as a running container before you start. When it finds one, the **simple setup is disabled** and you continue with the advanced setup: the simple path writes fixed values for host, port, `SESSION_SECURE` and `TRUST_PROXY`, which would silently downgrade an installation that already runs behind a reverse proxy. The wizard then guides you through:
+Open your browser and navigate to **http://localhost:8090**. The wizard detects your browser language (27 languages supported), verifies that a container engine is available (Docker with Compose v2, or Podman with `podman compose` / `podman-compose`), and reports an existing `.env` file as well as a running container before you start. The **simple setup** sets the public address (`BASE_URL`) to this computer's private address on your home network, for example `http://192.168.1.20:3000`, so invitation and password-reset links and the app on your phones work on the home Wi-Fi; it skips Docker bridges and VPN tunnels when it looks for that address, and the summary screen lets you change it. When it finds none, it says plainly that Yuvomi is then reachable only on this computer (`http://localhost:3000`). When it finds an existing `.env`, the **simple setup is disabled** and you continue with the advanced setup: the simple path writes fixed values for host, port, `SESSION_SECURE` and `TRUST_PROXY`, which would silently downgrade an installation that already runs behind a reverse proxy. The advanced setup instead fills its fields with the values from your `.env` - port, public address, exposure, timezone, weather, email, sign-on, storage and the rest - so whatever you leave untouched is written back unchanged, a hand-tuned `TRUST_PROXY=2` included, and the review page lists those values instead of "not set up". Passwords, client secrets and keys are never sent to the browser: their fields stay empty with the note "Current value is kept", and the installer puts the existing line back when it saves. The wizard then guides you through:
 
-- Basics - domain/IP, HTTP host port (`OIKOS_HTTP_PORT`), timezone (`TZ`, which pre-sets the household zone; that one is changeable later under Settings → Account → Appearance → Region), how Yuvomi is exposed (`SESSION_SECURE`, `TRUST_PROXY`) and the public address (`BASE_URL`). The exposure choice follows the host you enter, and the wizard rejects an `http://` address combined with enforced secure cookies - nobody could sign in to that combination. A typed public address only counts once it names a full `http://` or `https://` origin; until then the wizard keeps the address it derives from host and port. A timezone the browser does not recognise (`Europe/Berln`) is refused on the spot instead of silently falling back to UTC
+- Basics - domain/IP, HTTP host port (`OIKOS_HTTP_PORT`), timezone (`TZ`, which pre-sets the household zone; that one is changeable later under Settings → Account → Appearance → Region), how Yuvomi is exposed (`SESSION_SECURE`, `TRUST_PROXY`) and the public address (`BASE_URL`). The exposure choice follows the host you enter, and the wizard rejects an `http://` address combined with enforced secure cookies - nobody could sign in to that combination. A public address without `http://` or `https://` is refused with a message instead of being silently replaced by the address derived from host and port. A timezone the browser does not recognise (`Europe/Berln`) is refused on the spot instead of silently falling back to UTC
 - Security key generation (`SESSION_SECRET`, `DB_ENCRYPTION_KEY`) — on a re-run, keys already present in your `.env` are kept rather than regenerated, so running the wizard again on a live installation cannot lock you out of your encrypted database
 - Optional integrations (weather, Google Calendar, Outlook, Apple CalDAV)
 - Email/SMTP for the "forgot password" flow (`EMAIL_SMTP_*`, `EMAIL_FROM_*`)
@@ -313,9 +313,9 @@ docker compose up -d
 Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no Node.js installation needed.
 
 > **Pinning a version.** Every release is also published under immutable tags:
-> `2.82.0` (exact version), `2.81` (latest patch of that minor), plus a moving `main`
+> `2.83.0` (exact version), `2.83` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
-> set `image: ghcr.io/ulsklyc/yuvomi:2.82.0` in your compose file and bump it
+> set `image: ghcr.io/ulsklyc/yuvomi:2.83.0` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
 
 > **Verifying what you pull.** Every image the publish workflow builds is signed at build
@@ -324,7 +324,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > image you are about to run is one GitHub built from a release tag of this repository:
 >
 > ```bash
-> cosign verify ghcr.io/ulsklyc/yuvomi:2.82.0 \
+> cosign verify ghcr.io/ulsklyc/yuvomi:2.83.0 \
 >   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 >   --certificate-identity-regexp '^https://github.com/ulsklyc/yuvomi/.github/workflows/docker-publish.yml@refs/tags/v'
 > ```
@@ -333,7 +333,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > anything else means the image is not one this repository released. The `main` tag is
 > signed too, under `refs/heads/main`, which the pattern above deliberately excludes. Tags
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
-> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.82.0 --format '{{ json .Provenance }}'`.
+> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.83.0 --format '{{ json .Provenance }}'`.
 
 Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 
@@ -378,7 +378,7 @@ docker compose logs -f
 You should see output like:
 
 ```
-yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.82.0
+yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.83.0
 yuvomi  | [Yuvomi] Environment: production
 yuvomi  | [Sync] Auto-sync active every 15 minutes.
 ```
@@ -555,6 +555,43 @@ Generate a secure `SESSION_SECRET`:
 openssl rand -hex 32
 ```
 
+### Secrets from Files (Optional)
+
+Instead of putting a secret into `.env` or an environment variable, point `<NAME>_FILE` at a file that holds it. The content of the file is used as the value of `<NAME>`, the same convention as the official postgres and mysql images. This fits Docker and Podman secrets, a Vault Agent, or any mounted secret file.
+
+Supported names: `SESSION_SECRET`, `DB_ENCRYPTION_KEY`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_DRIVE_CLIENT_SECRET`, `MS_CLIENT_SECRET`, `OIDC_CLIENT_SECRET`, `APPLE_APP_SPECIFIC_PASSWORD`, `OPENWEATHER_API_KEY`, `FIXER_API_KEY`, `WEBDAV_BACKUP_PASSWORD`, `DOCUMENT_STORAGE_WEBDAV_PASSWORD`, `VAPID_PRIVATE_KEY`, `EMAIL_SMTP_PASS` and `IMMICH_API_KEY`. Each takes a `_FILE` variant, for example `SESSION_SECRET_FILE`.
+
+```yaml
+services:
+  yuvomi:
+    environment:
+      SESSION_SECRET_FILE: /run/secrets/session_secret
+      DB_ENCRYPTION_KEY_FILE: /run/secrets/db_encryption_key
+    secrets: [session_secret, db_encryption_key]
+
+secrets:
+  session_secret:
+    file: ./secrets/session_secret
+  db_encryption_key:
+    file: ./secrets/db_encryption_key
+```
+
+- Set either `<NAME>` or `<NAME>_FILE`, not both: the start stops with a message naming the variable.
+- A missing, unreadable or empty file stops the start. There is no silent fallback, because for `DB_ENCRYPTION_KEY` that would start on a new, unencrypted database.
+- Line breaks at the end of the file are ignored; everything else, spaces included, belongs to the value. Keep a copy of the database key elsewhere: it cannot be recovered or changed on an existing database.
+- Remove the matching `<NAME>=` lines from `.env`.
+- This is for setups where you write the compose file yourself (Docker Compose, Podman, Quadlet). The TrueNAS, Umbrel, Unraid and Portainer templates always set `SESSION_SECRET` themselves, so adding `SESSION_SECRET_FILE` there stops the start.
+
+**File permissions.** The file is read by the user the app runs as, not by root: the image's entrypoint switches to `node` (uid 1000) before the server starts, and TrueNAS starts the container as uid 568 from the outset. This differs from the postgres image, which reads its secret files as root. A file that belongs to root with mode `600` therefore stops the start with `EACCES`. With Docker Compose the secret is a bind mount that keeps the owner and mode from the host, so create the file under `umask 077` and hand it to that uid:
+
+```bash
+mkdir -p secrets
+(umask 077; printf '%s' "$(openssl rand -hex 32)" > secrets/db_encryption_key)
+sudo chown 1000:1000 secrets/db_encryption_key   # 568:568 on TrueNAS
+```
+
+Without `umask 077`, a plain `printf ... >` creates a file every user on the host can read; the start then logs a warning naming the variable, the path and the mode. Podman and Docker Swarm mount their secrets read-only and readable (`0444`) inside the container, so there is nothing to change there and no warning. Kubernetes secret volumes default to `0644` and do get the warning: set `defaultMode: 0440` together with `fsGroup: 1000` on the pod.
+
 ### Web Push (Optional)
 
 Push notifications deliver due reminders to a device as system notifications even when the app
@@ -646,7 +683,7 @@ makes exactly that field read-only in the settings UI; empty values fall back to
 |----------|-------------|---------|----------|
 | `EMAIL_SMTP_HOST` | SMTP server hostname. | - | No |
 | `EMAIL_SMTP_PORT` | SMTP server port. | `587` (`465` with `ssl`) | No |
-| `EMAIL_SMTP_SECURE` | Connection security: `ssl`, `starttls`, or `none`. | `starttls` | No |
+| `EMAIL_SMTP_SECURE` | Connection security: `ssl`, `starttls`, or `none`. `none` sends unencrypted and never switches to STARTTLS, even when the server offers it (for an internal relay on port 25). | `starttls` | No |
 | `EMAIL_SMTP_USER` | SMTP auth username. | - | No |
 | `EMAIL_SMTP_PASS` | SMTP auth password. | - | No |
 | `EMAIL_FROM_ADDRESS` | Sender email address. | - | No |
@@ -1214,7 +1251,7 @@ SESSION_SECURE=true
 TRUST_PROXY=1
 ```
 
-> Both installers set these for you. The web installer's **Advanced** step asks for your deployment type; the CLI installer derives them from the scheme of the base URL you enter — `https://` means proxy (`SESSION_SECURE=true`, `TRUST_PROXY=1`), anything else means direct access (`SESSION_SECURE=false`, `TRUST_PROXY=loopback`). A value already present in your `.env` always wins, so a hand-tuned `TRUST_PROXY=2` survives a re-run.
+> Both installers set these for you. The web installer's **Basic Configuration** step asks how Yuvomi is exposed (direct or behind a reverse proxy); the CLI installer derives them from the scheme of the base URL you enter — `https://` means proxy (`SESSION_SECURE=true`, `TRUST_PROXY=1`), anything else means direct access (`SESSION_SECURE=false`, `TRUST_PROXY=loopback`). On a re-run both keep a hand-tuned `TRUST_PROXY=2`: the CLI installer keeps any value already in your `.env`, and the web installer keeps it as long as you leave the exposure choice it pre-selects from your `.env` unchanged.
 
 Then restart the container so the new values take effect:
 
