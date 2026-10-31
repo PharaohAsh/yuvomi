@@ -4834,17 +4834,17 @@ function withLocalStorageSync(stub, fn) {
   }
 }
 
-test('Wand-Modus: Einstellungs-Knopf fuer Mitglieder, nicht fuer ein Display-Konto', async () => {
+test('Wall mode: settings button for members, not for a display account', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   await withWallWindow(() => {
     const data = { urgentTasks: wallTasks(1), users: [] };
     const member  = __test.renderWallSurface(data, null);
     const display = __test.renderWallSurface(data, null, { isDisplay: true });
     const button = member.match(/<button[^>]*id="wall-settings"[\s\S]*?<\/button>/)?.[0] ?? '';
-    nodeAssert.match(button, /aria-label="nav\.settings"/, 'zugaenglicher Name');
-    nodeAssert.match(button, /class="wall__foot-btn wall__foot-btn--icon"/, 'die Icon-Form des Fussknopfs');
-    nodeAssert.ok(!/id="wall-settings"/.test(display), 'ein Display darf die Einstellungen nicht oeffnen');
-    // Im Lade-Zustand steht er auch - er haengt wie der Ausstieg an keinen Daten.
+    nodeAssert.match(button, /aria-label="nav\.settings"/, 'accessible name');
+    nodeAssert.match(button, /class="wall__foot-btn wall__foot-btn--icon"/, 'icon form of the foot button');
+    nodeAssert.ok(!/id="wall-settings"/.test(display), 'a display may not open settings');
+    // Present while loading too - like the exit, it depends on no data.
     nodeAssert.match(__test.renderWallSurface(null, null, { loading: true }), /id="wall-settings"/);
   });
 });

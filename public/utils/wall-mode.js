@@ -62,8 +62,8 @@
  *      (d) es ist aus zwei Metern bedienbar - wenige grosse Ziele, keine
  *          Eingabefelder, keine Auswahl-Ebene davor.
  *    Was eine davon reisst, gehoert nicht hierher, sondern in die App.
- *    Ausgenommen sind die Wege HINAUS, die die Flaeche verlassen statt sie zu
- *    bedienen: der Ausstieg und der Knopf in die Einstellungen.
+ *    Exempt are the ways OUT, which leave the surface instead of operating it:
+ *    the exit and the settings button.
  *
  * ── WARUM DIE ATTRIBUTE AN DER WURZEL HAENGEN ─────────────────────────────
  *

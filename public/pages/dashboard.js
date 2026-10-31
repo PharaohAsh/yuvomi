@@ -8884,9 +8884,9 @@ function renderWallSurface(data, weather, { failed = false, loading = false, upd
   const stamp = updatedAt
     ? `<p class="wall__updated">${esc(t('dashboard.updatedAt', { time: formatTime(updatedAt) }))}</p>`
     : '<p class="wall__updated"></p>';
-  // Die Einstellungen stehen am Anfang, nicht bei Schoner und Ausstieg: dort ist
-  // die Gruppe auf die Mitte der Startknoepfe ausgemessen (siehe dashboard.css).
-  // Ein Display-Konto bekommt sie nicht - es darf sie nicht oeffnen (#1208).
+  // Settings sit at the start, not beside screensaver and exit: that group is
+  // measured to keep the timer buttons centred (see dashboard.css).
+  // A display account doesn't get it - it may not open settings (#1208).
   const settings = isDisplay ? '' : `
           <button type="button" class="wall__foot-btn wall__foot-btn--icon" id="wall-settings"
                   aria-label="${esc(t('nav.settings'))}"
@@ -8983,8 +8983,8 @@ function wireWallExit(container, rerender, signal) {
 
   container.addEventListener('click', (event) => {
     if (event.target.closest('#wall-exit')) leave();
-    // Datenunabhaengig wie der Ausstieg. Die Navigation gibt den Marker selbst
-    // frei, der Modus bleibt gemerkt - Zurueck fuehrt wieder auf die Wand.
+    // Data-independent like the exit. Navigating releases the marker itself and
+    // the mode stays stored, so Back returns to the wall.
     if (event.target.closest('#wall-settings')) window.yuvomi?.navigate('/settings/personal/device');
   }, { signal });
   window.addEventListener('keydown', (event) => {
