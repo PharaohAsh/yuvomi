@@ -8884,6 +8884,15 @@ function renderWallSurface(data, weather, { failed = false, loading = false, upd
   const stamp = updatedAt
     ? `<p class="wall__updated">${esc(t('dashboard.updatedAt', { time: formatTime(updatedAt) }))}</p>`
     : '<p class="wall__updated"></p>';
+  // Die Einstellungen stehen am Anfang, nicht bei Schoner und Ausstieg: dort ist
+  // die Gruppe auf die Mitte der Startknoepfe ausgemessen (siehe dashboard.css).
+  // Ein Display-Konto bekommt sie nicht - es darf sie nicht oeffnen (#1208).
+  const settings = isDisplay ? '' : `
+          <button type="button" class="wall__foot-btn wall__foot-btn--icon" id="wall-settings"
+                  aria-label="${esc(t('nav.settings'))}"
+                  title="${esc(t('nav.settings'))}">
+            <i data-lucide="settings" aria-hidden="true"></i>
+          </button>`;
 
   return `
     <div class="wall" id="wall-surface" tabindex="-1" aria-label="${esc(t('settings.wallModeLabel'))}" role="region">
@@ -8891,7 +8900,7 @@ function renderWallSurface(data, weather, { failed = false, loading = false, upd
       <div class="wall__stage${failed || loading ? ' wall__stage--single' : ''}">${main}</div>
       ${timer.display}
       <div class="wall__foot" data-toast-keepout>
-        ${stamp}
+        <div class="wall__foot-start">${stamp}${settings}</div>
         ${timer.controls}
         <div class="wall__foot-end">${screensaverEnabled && !timer.display ? `
           <button type="button" class="wall__foot-btn wall__foot-btn--icon" id="wall-screensaver-start"
@@ -8974,6 +8983,9 @@ function wireWallExit(container, rerender, signal) {
 
   container.addEventListener('click', (event) => {
     if (event.target.closest('#wall-exit')) leave();
+    // Datenunabhaengig wie der Ausstieg. Die Navigation gibt den Marker selbst
+    // frei, der Modus bleibt gemerkt - Zurueck fuehrt wieder auf die Wand.
+    if (event.target.closest('#wall-settings')) window.yuvomi?.navigate('/settings/personal/device');
   }, { signal });
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') leave();

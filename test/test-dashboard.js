@@ -4834,6 +4834,21 @@ function withLocalStorageSync(stub, fn) {
   }
 }
 
+test('Wand-Modus: Einstellungs-Knopf fuer Mitglieder, nicht fuer ein Display-Konto', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  await withWallWindow(() => {
+    const data = { urgentTasks: wallTasks(1), users: [] };
+    const member  = __test.renderWallSurface(data, null);
+    const display = __test.renderWallSurface(data, null, { isDisplay: true });
+    const button = member.match(/<button[^>]*id="wall-settings"[\s\S]*?<\/button>/)?.[0] ?? '';
+    nodeAssert.match(button, /aria-label="nav\.settings"/, 'zugaenglicher Name');
+    nodeAssert.match(button, /class="wall__foot-btn wall__foot-btn--icon"/, 'die Icon-Form des Fussknopfs');
+    nodeAssert.ok(!/id="wall-settings"/.test(display), 'ein Display darf die Einstellungen nicht oeffnen');
+    // Im Lade-Zustand steht er auch - er haengt wie der Ausstieg an keinen Daten.
+    nodeAssert.match(__test.renderWallSurface(null, null, { loading: true }), /id="wall-settings"/);
+  });
+});
+
 test('Wand-Modus: Screensaver-Knopf faellt weg, solange ein Timer laeuft (#1766)', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   await withWallWindow(() => {

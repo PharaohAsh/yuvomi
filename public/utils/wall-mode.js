@@ -62,6 +62,8 @@
  *      (d) es ist aus zwei Metern bedienbar - wenige grosse Ziele, keine
  *          Eingabefelder, keine Auswahl-Ebene davor.
  *    Was eine davon reisst, gehoert nicht hierher, sondern in die App.
+ *    Ausgenommen sind die Wege HINAUS, die die Flaeche verlassen statt sie zu
+ *    bedienen: der Ausstieg und der Knopf in die Einstellungen.
  *
  * ── WARUM DIE ATTRIBUTE AN DER WURZEL HAENGEN ─────────────────────────────
  *
