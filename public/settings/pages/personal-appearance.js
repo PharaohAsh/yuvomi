@@ -369,6 +369,7 @@ export function screensaverIdleOptions() {
 }
 
 // Seconds below a minute, minutes from there, in the UI language like the delay.
+/** @param {number} seconds */
 function screensaverSlideText(seconds) {
   return seconds < 60
     ? formatUnit(seconds, 'second', { unitDisplay: 'long' })
@@ -379,13 +380,14 @@ function screensaverSlideText(seconds) {
 // value.
 export function screensaverSlideOptions() {
   const current = getScreensaverSlideSeconds();
-  return SCREENSAVER_SLIDE_STEPS.map((seconds) => `
+  return SCREENSAVER_SLIDE_STEPS.map((/** @type {number} */ seconds) => `
     <option value="${seconds}"${seconds === current ? ' selected' : ''}>${esc(screensaverSlideText(seconds))}</option>`).join('');
 }
 
 /**
  * Time per photo: read at the next start like the switches below, so the same
  * toast. Exported so test:screensaver-device can drive the real handler.
+ * @param {{ value: string, addEventListener(type: 'change', listener: () => void): void } | null | undefined} select
  */
 export function bindScreensaverSlideSelect(select) {
   select?.addEventListener('change', () => {

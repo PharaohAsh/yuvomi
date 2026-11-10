@@ -414,7 +414,7 @@ export function todaySheetContext({
   };
   // Dieselbe Ausnahme fuer das Widget-Recht: es erbt die Modulsperre
   // (resolvePermissions), und ohne sie schwieg die Abfuhr an der Wand doch.
-  const canSee = (widget) => (isDisplay && WALL_DISPLAY_MODULES.has(widget)) || canSeeWidget(widget);
+  const canSee = (/** @type {string} */ widget) => (isDisplay && WALL_DISPLAY_MODULES.has(widget)) || canSeeWidget(widget);
   return { todayKey, tomorrowKey, nowTime, isAdmin, viewer, moduleOff, canSeeWidget: canSee, widgetShown, existing };
 }
 

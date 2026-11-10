@@ -102,6 +102,7 @@ test('a junk value and a blocked storage fall back to the defaults without throw
 // the real formatTime with a display zone and the 12h preference.
 
 const listeners = {};
+/** @type {{ message: string, type: string }[]} */
 const toasts = [];
 const requests = [];
 const pageStorage = makeStorage();
@@ -335,6 +336,7 @@ test('the time per photo is stored on this device and read at every start', asyn
   assert.match(screensaverSlideOptions(), /value="20" selected/);
 
   toasts.length = 0;
+  /** @type {{ value: string, handlers: Record<string, () => void>, addEventListener(name: string, handler: () => void): void }} */
   const select = { value: '60', handlers: {}, addEventListener(name, handler) { this.handlers[name] = handler; } };
   bindScreensaverSlideSelect(select);
   select.handlers.change();
