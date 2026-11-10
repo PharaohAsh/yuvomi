@@ -2183,7 +2183,7 @@
         "wallModeOn": "Mode dinding aktif, terlihat di {{page}}.",
         "wallModeOff": "Mode dinding mati.",
         "nightHoursLabel": "Jam malam",
-        "nightHoursHint": "Pada jam-jam ini mode dinding dan screensaver meredup, mengikuti jam rumah tangga. Hanya berlaku untuk perangkat ini.",
+        "nightHoursHint": "Pada jam-jam ini mode dinding meredup dan screensaver menjadi hitam, mengikuti jam rumah tangga. Hanya berlaku untuk perangkat ini.",
         "nightHoursFrom": "Redupkan dari",
         "nightHoursUntil": "Redupkan sampai",
         "nightHoursSaved": "Jam malam di perangkat ini: {{from}} sampai {{until}}.",

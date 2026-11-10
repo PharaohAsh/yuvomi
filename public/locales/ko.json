@@ -2183,7 +2183,7 @@
         "wallModeOn": "벽면 모드를 켰습니다. {{page}}에서 볼 수 있습니다.",
         "wallModeOff": "벽면 모드를 껐습니다.",
         "nightHoursLabel": "야간 시간",
-        "nightHoursHint": "이 시간에는 벽면 모드와 화면 보호기가 가정의 시각에 맞춰 어두워집니다. 이 기기에만 적용됩니다.",
+        "nightHoursHint": "이 시간에는 가정의 시각에 맞춰 벽면 모드가 어두워지고 화면 보호기는 검은 화면이 됩니다. 이 기기에만 적용됩니다.",
         "nightHoursFrom": "어둡게 시작",
         "nightHoursUntil": "어둡게 종료",
         "nightHoursSaved": "이 기기의 야간 시간: {{from}}부터 {{until}}까지.",

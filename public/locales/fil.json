@@ -2183,7 +2183,7 @@
         "wallModeOn": "Naka-on ang wall mode, makikita sa {{page}}.",
         "wallModeOff": "Naka-off ang wall mode.",
         "nightHoursLabel": "Oras ng gabi",
-        "nightHoursHint": "Sa mga oras na ito, dumidilim ang wall mode at ang screensaver, ayon sa oras ng bahay. Para lang sa device na ito.",
+        "nightHoursHint": "Sa mga oras na ito, dumidilim ang wall mode at nagiging itim ang screensaver, ayon sa oras ng bahay. Para lang sa device na ito.",
         "nightHoursFrom": "Padilimin mula",
         "nightHoursUntil": "Padilimin hanggang",
         "nightHoursSaved": "Oras ng gabi sa device na ito: {{from}} hanggang {{until}}.",

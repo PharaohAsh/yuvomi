@@ -2028,7 +2028,7 @@
         "wallModeOn": "Väggläge på, syns under {{page}}.",
         "wallModeOff": "Väggläge av.",
         "nightHoursLabel": "Nattimmar",
-        "nightHoursHint": "Under de här timmarna dämpas väggläget och skärmsläckaren, efter hushållets klocka. Gäller bara den här enheten.",
+        "nightHoursHint": "Under de här timmarna dämpas väggläget och skärmsläckaren blir svart, efter hushållets klocka. Gäller bara den här enheten.",
         "nightHoursFrom": "Dämpa från",
         "nightHoursUntil": "Dämpa till",
         "nightHoursSaved": "Nattimmar på den här enheten: {{from}} till {{until}}.",

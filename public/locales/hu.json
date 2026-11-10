@@ -2138,7 +2138,7 @@
         "wallModeOn": "Fali mód bekapcsolva, itt látszik: {{page}}.",
         "wallModeOff": "Fali mód kikapcsolva.",
         "nightHoursLabel": "Éjszakai órák",
-        "nightHoursHint": "Ezekben az órákban a fali mód és a képernyővédő elhalványul, a háztartás órája szerint. Csak erre az eszközre vonatkozik.",
+        "nightHoursHint": "Ezekben az órákban a fali mód elhalványul, a képernyővédő pedig elsötétül, a háztartás órája szerint. Csak erre az eszközre vonatkozik.",
         "nightHoursFrom": "Halványítás ettől",
         "nightHoursUntil": "Halványítás eddig",
         "nightHoursSaved": "Éjszakai órák ezen az eszközön: {{from}} - {{until}}.",

@@ -2028,7 +2028,7 @@
         "wallModeOn": "壁挂模式已开启，可在{{page}}中查看。",
         "wallModeOff": "壁挂模式已关闭。",
         "nightHoursLabel": "夜间时段",
-        "nightHoursHint": "在这段时间内，壁挂模式和屏保会按家庭时间自动变暗。仅适用于此设备。",
+        "nightHoursHint": "在这段时间内，壁挂模式会按家庭时间自动变暗，屏保则变为全黑。仅适用于此设备。",
         "nightHoursFrom": "变暗开始",
         "nightHoursUntil": "变暗结束",
         "nightHoursSaved": "此设备的夜间时段：{{from}} 至 {{until}}。",

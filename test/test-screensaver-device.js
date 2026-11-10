@@ -145,6 +145,12 @@ const pageRoot = {
 const overlay = () => body.children.find((node) => node.className === 'photo-screensaver');
 const caption = (node) => node.children.find((child) => child.tag === 'p' && !child.className);
 const clockOf = (node) => node.children.find((child) => child.className === 'photo-screensaver__clock');
+/** @param {{ children: Array<{ tag: string, src?: string }> }} node */
+const imageOf = (node) => {
+  const image = node.children.find((child) => child.tag === 'img');
+  assert.ok(image, 'the screensaver has its image');
+  return image;
+};
 const gesture = () => {
   for (const handler of listeners.pointerdown) handler({ preventDefault() {}, stopImmediatePropagation() {} });
 };
@@ -154,10 +160,12 @@ const PHOTOS = { data: { enabled: true, photos: [{ id: 'p1' }, { id: 'p2' }, { i
 let component;
 async function page() {
   if (component) return component;
-  // 03:43:20 UTC, which is 09:13:20 in Kolkata (+05:30, no daylight saving):
-  // twenty seconds into a minute, so the first turn is 40 s away, and an hour
-  // that differs between the zone and UTC.
-  mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: Date.UTC(2026, 9, 8, 3, 43, 20) });
+  // 12:43:20 UTC, which is 18:13:20 in Kolkata (+05:30, no daylight saving):
+  // twenty seconds into a minute, so the first turn is 40 s away, an hour
+  // that differs between the zone and UTC, and daytime in both - at night the
+  // screensaver shows no photo (#1901). The npm script pins TZ=UTC for the
+  // device clock.
+  mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: Date.UTC(2026, 9, 8, 12, 43, 20) });
   globalThis.window = {
     addEventListener: (name, handler) => { (listeners[name] ||= []).push(handler); },
     yuvomi: { showToast: (message, type) => toasts.push({ message, type }) },
@@ -738,7 +746,7 @@ test('theme-init.js paints the night on the household clock and the hours of thi
   }
 });
 
-test('the screensaver dims at night without wall mode, and the hour turns it while it shows (#1901)', async () => {
+test('the screensaver goes black at night without wall mode, and the hour turns it while it shows (#1901)', async () => {
   await page();
   assert.equal(pageRoot.hasAttribute('data-wall-mode'), false, 'no wall mode on this page');
   setZone('UTC');
@@ -747,13 +755,18 @@ test('the screensaver dims at night without wall mode, and the hour turns it whi
     // A window that holds the current hour, and then one that does not.
     night.setNightHours(hour, (hour + 2) % 24);
     const node = await openScreensaver();
-    assert.equal(node.dataset.night, '', 'dimmed from the first photo');
+    assert.equal(node.dataset.night, '', 'black from the start');
+    assert.equal(imageOf(node).src, undefined, 'and no photo loaded for a black screen');
     night.setNightHours((hour + 3) % 24, (hour + 5) % 24);
     mock.timers.tick(20_000);
-    assert.equal('night' in node.dataset, false, 'the next photo is back to full brightness, without a touch');
+    assert.equal('night' in node.dataset, false, 'the next tick is back to full brightness, without a touch');
+    const daySrc = imageOf(node).src;
+    assert.ok(daySrc, 'a photo is loaded by day');
+    assert.match(daySrc, /^\/api\/v1\/screensaver\/photos\//, 'with a photo');
     night.setNightHours(hour, (hour + 2) % 24);
     mock.timers.tick(20_000);
-    assert.equal(node.dataset.night, '', 'and dims again on the next photo');
+    assert.equal(node.dataset.night, '', 'and goes black again on the next tick');
+    assert.equal(imageOf(node).src, daySrc, 'without loading another photo');
     gesture();
   } finally {
     night.setNightHours(22, 6);
@@ -761,13 +774,13 @@ test('the screensaver dims at night without wall mode, and the hour turns it whi
   }
 });
 
-test('the night rule dims photo, clock and caption alike, and glides only with motion allowed', () => {
+test('the night rule blacks out photo, clock and caption alike, and glides only with motion allowed', () => {
   const css = read('../public/styles/screensaver.css');
   const rule = css.match(/\.photo-screensaver\[data-night\] img,\s*\.photo-screensaver\[data-night\] p \{([^}]*)\}/);
   assert.ok(rule, 'one rule for the photo and both texts (the clock is a p)');
   assert.match(rule[1], /filter: brightness\(var\(--screensaver-night-brightness\)\)/);
   const level = Number(css.match(/--screensaver-night-brightness: ([\d.]+)/)?.[1]);
-  assert.ok(level > 0 && level < 1, `darker, not black: ${level}`);
+  assert.equal(level, 0, 'black, not dimmed: a wall tablet must not light the hallway at night');
   assert.match(css, /\.photo-screensaver img,\s*\.photo-screensaver p \{\s*transition: opacity 1\.2s ease, filter 2s ease;/);
   assert.match(css, /prefers-reduced-motion: reduce\) \{\s*\.photo-screensaver img,\s*\.photo-screensaver p \{ transition: none; \}/);
 });

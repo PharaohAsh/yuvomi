@@ -2259,7 +2259,7 @@
         "wallModeOn": "Nástěnný režim zapnut, uvidíte ho v {{page}}.",
         "wallModeOff": "Nástěnný režim vypnut.",
         "nightHoursLabel": "Noční hodiny",
-        "nightHoursHint": "V těchto hodinách se nástěnný režim a spořič obrazovky ztlumí, podle času domácnosti. Platí jen pro toto zařízení.",
+        "nightHoursHint": "V těchto hodinách se nástěnný režim ztlumí a spořič obrazovky zčerná, podle času domácnosti. Platí jen pro toto zařízení.",
         "nightHoursFrom": "Ztlumit od",
         "nightHoursUntil": "Ztlumit do",
         "nightHoursSaved": "Noční hodiny na tomto zařízení: {{from}} až {{until}}.",

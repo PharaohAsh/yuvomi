@@ -65,7 +65,7 @@
     "test:dashboard-rewards": "node --test test/test-dashboard-rewards.js",
     "test:screensaver": "node --test test/test-screensaver.js",
     "test:screensaver-idle": "node --loader ./test/test-browser-loader.mjs --test test/test-screensaver-idle.js",
-    "test:screensaver-device": "node --loader ./test/test-browser-loader.mjs --test test/test-screensaver-device.js",
+    "test:screensaver-device": "node scripts/with-env.mjs TZ=UTC node --loader ./test/test-browser-loader.mjs --test test/test-screensaver-device.js",
     "test:multi-assignment": "node test/test-multi-assignment.js",
     "test:visibility": "node test/test-visibility.js",
     "test:sync-default-assignee": "node scripts/with-env.mjs DB_PATH=:memory: node test/test-sync-default-assignee.js",

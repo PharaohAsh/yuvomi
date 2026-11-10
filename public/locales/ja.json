@@ -2028,7 +2028,7 @@
         "wallModeOn": "ウォールモードをオンにしました。{{page}} に表示されます。",
         "wallModeOff": "ウォールモードをオフにしました。",
         "nightHoursLabel": "夜間の時間帯",
-        "nightHoursHint": "この時間帯は、ウォールモードとスクリーンセーバーが家庭の時刻に合わせて暗くなります。このデバイスにのみ適用されます。",
+        "nightHoursHint": "この時間帯は、家庭の時刻に合わせてウォールモードが暗くなり、スクリーンセーバーは黒い画面になります。このデバイスにのみ適用されます。",
         "nightHoursFrom": "暗くする開始",
         "nightHoursUntil": "暗くする終了",
         "nightHoursSaved": "このデバイスの夜間の時間帯: {{from}}から{{until}}まで。",
