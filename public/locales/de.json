@@ -2183,7 +2183,7 @@
         "wallModeOn": "Wand-Modus an - sichtbar unter {{page}}.",
         "wallModeOff": "Wand-Modus aus.",
         "nightHoursLabel": "Nachtstunden",
-        "nightHoursHint": "In diesen Stunden dunkeln Wand-Modus und Bildschirmschoner ab, nach der Uhr des Haushalts. Gilt nur für dieses Gerät.",
+        "nightHoursHint": "In diesen Stunden dunkelt der Wand-Modus ab und der Bildschirmschoner wird schwarz, nach der Uhr des Haushalts. Gilt nur für dieses Gerät.",
         "nightHoursFrom": "Abdunkeln ab",
         "nightHoursUntil": "Abdunkeln bis",
         "nightHoursSaved": "Nachtstunden auf diesem Gerät: {{from}} bis {{until}}.",

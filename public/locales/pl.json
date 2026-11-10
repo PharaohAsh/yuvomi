@@ -2365,7 +2365,7 @@
         "wallModeOn": "Tryb ścienny włączony, widoczny w {{page}}.",
         "wallModeOff": "Tryb ścienny wyłączony.",
         "nightHoursLabel": "Godziny nocne",
-        "nightHoursHint": "W tych godzinach tryb ścienny i wygaszacz przygasają, według zegara domu. Dotyczy tylko tego urządzenia.",
+        "nightHoursHint": "W tych godzinach tryb ścienny przygasa, a wygaszacz robi się czarny, według zegara domu. Dotyczy tylko tego urządzenia.",
         "nightHoursFrom": "Przygaś od",
         "nightHoursUntil": "Przygaś do",
         "nightHoursSaved": "Godziny nocne na tym urządzeniu: od {{from}} do {{until}}.",

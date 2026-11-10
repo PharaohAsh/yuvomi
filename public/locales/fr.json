@@ -2028,7 +2028,7 @@
         "wallModeOn": "Mode mural activé - visible dans {{page}}.",
         "wallModeOff": "Mode mural désactivé.",
         "nightHoursLabel": "Heures de nuit",
-        "nightHoursHint": "Pendant ces heures, le mode mural et l'économiseur d'écran s'assombrissent, à l'heure du foyer. S'applique uniquement à cet appareil.",
+        "nightHoursHint": "Pendant ces heures, le mode mural s'assombrit et l'économiseur d'écran devient noir, à l'heure du foyer. S'applique uniquement à cet appareil.",
         "nightHoursFrom": "Assombrir de",
         "nightHoursUntil": "Assombrir jusqu'à",
         "nightHoursSaved": "Heures de nuit sur cet appareil : de {{from}} à {{until}}.",

@@ -2138,7 +2138,7 @@
         "wallModeOn": "Wall mode on - visible under {{page}}.",
         "wallModeOff": "Wall mode off.",
         "nightHoursLabel": "Night hours",
-        "nightHoursHint": "During these hours wall mode and the screensaver dim, on the household's clock. Applies to this device only.",
+        "nightHoursHint": "During these hours wall mode dims and the screensaver turns black, on the household's clock. Applies to this device only.",
         "nightHoursFrom": "Dim from",
         "nightHoursUntil": "Dim until",
         "nightHoursSaved": "Night hours on this device: {{from}} to {{until}}.",

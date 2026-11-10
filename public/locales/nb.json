@@ -2138,7 +2138,7 @@
         "wallModeOn": "Veggmodus på - synlig under {{page}}.",
         "wallModeOff": "Veggmodus av.",
         "nightHoursLabel": "Nattetimer",
-        "nightHoursHint": "I disse timene dimmes veggmodus og skjermspareren, etter husstandens klokke. Gjelder bare denne enheten.",
+        "nightHoursHint": "I disse timene dimmes veggmodus og skjermspareren blir svart, etter husstandens klokke. Gjelder bare denne enheten.",
         "nightHoursFrom": "Dim fra",
         "nightHoursUntil": "Dim til",
         "nightHoursSaved": "Nattetimer på denne enheten: {{from}} til {{until}}.",

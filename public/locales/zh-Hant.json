@@ -2028,7 +2028,7 @@
         "wallModeOn": "壁掛模式已開啟，可在{{page}}中檢視。",
         "wallModeOff": "壁掛模式已關閉。",
         "nightHoursLabel": "夜間時段",
-        "nightHoursHint": "在這段時間內，壁掛模式與螢幕保護會依家庭時間自動變暗。僅適用於此裝置。",
+        "nightHoursHint": "在這段時間內，壁掛模式會依家庭時間自動變暗，螢幕保護則變為全黑。僅適用於此裝置。",
         "nightHoursFrom": "變暗開始",
         "nightHoursUntil": "變暗結束",
         "nightHoursSaved": "此裝置的夜間時段：{{from}} 至 {{until}}。",

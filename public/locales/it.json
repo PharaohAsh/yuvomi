@@ -2028,7 +2028,7 @@
         "wallModeOn": "Modalità parete attiva, visibile in {{page}}.",
         "wallModeOff": "Modalità parete disattivata.",
         "nightHoursLabel": "Ore notturne",
-        "nightHoursHint": "In queste ore la modalità parete e il salvaschermo si attenuano, secondo l'ora di casa. Vale solo per questo dispositivo.",
+        "nightHoursHint": "In queste ore la modalità parete si attenua e il salvaschermo diventa nero, secondo l'ora di casa. Vale solo per questo dispositivo.",
         "nightHoursFrom": "Attenua dalle",
         "nightHoursUntil": "Attenua fino alle",
         "nightHoursSaved": "Ore notturne su questo dispositivo: dalle {{from}} alle {{until}}.",

@@ -53,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on 24 and 26 and no longer need the SQLite flag. Anyone who still runs a bare-metal
   install on Node 22 sees a one-line message at start that names the supported range; update
   Node, then start again. The container image is unchanged and already runs on Node 24.
+- **The photo screensaver turns black during the night hours instead of dimming.** Half
+  brightness still lit up a dark hallway. Between "dim from" and "dim until" (Settings - This
+  device - Night hours, 22:00 to 06:00 unless you change it) the screensaver now shows a plain
+  black screen with no photo, clock or caption, and loads no photos. It fades to black at the
+  start of the night and back to photos at the end, by itself. Wall mode still dims as before.
 
 ## [2.87.0] - 2026-11-08
 

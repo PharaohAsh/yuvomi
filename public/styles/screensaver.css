@@ -39,16 +39,16 @@
 .photo-screensaver p[data-position="2"] { right: 1.25rem; top: 1.25rem; }
 .photo-screensaver p[data-position="3"] { left: 1.25rem; top: 1.25rem; }
 
-/* NACHTS GEDIMMT (#1901): in den Nachtstunden dieses Geraets (Vorgabe 22 bis
+/* NACHTS SCHWARZ (#1901): in den Nachtstunden dieses Geraets (Vorgabe 22 bis
    6 Uhr, utils/night-hours.js) traegt der Schoner `data-night`. Foto, Uhr und
-   Beschriftung dunkeln um dasselbe Mass ab, ueber `brightness` statt
-   `opacity`: die Deckkraft des Fotos ist schon die Ueberblendung zwischen zwei
-   Bildern. Halbe Helligkeit laesst ein Foto auf kleinster Hintergrund-
-   beleuchtung noch erkennen, und Weiss wird zu einem mittleren Grau auf der
-   dunklen Platte - lesbar, ohne den Flur auszuleuchten. Der Wechsel um 22:00
-   gleitet ueber zwei Sekunden, statt zu springen. */
+   Beschriftung gehen auf Helligkeit 0 - ein reines Schwarz, auf OLED sind die
+   Pixel aus. Halbe Helligkeit leuchtete den Flur noch aus. Ueber `brightness`
+   statt `opacity`: die Deckkraft des Fotos ist schon die Ueberblendung
+   zwischen zwei Bildern. Der Wechsel um 22:00 gleitet ueber zwei Sekunden,
+   statt zu springen; nachts laedt der Schoner keine Fotos
+   (components/photo-screensaver.js). */
 .photo-screensaver {
-  --screensaver-night-brightness: 0.5;
+  --screensaver-night-brightness: 0;
 }
 
 .photo-screensaver img,

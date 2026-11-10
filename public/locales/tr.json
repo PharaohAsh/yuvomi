@@ -2028,7 +2028,7 @@
         "wallModeOn": "Duvar modu açık, {{page}} sayfasında görünür.",
         "wallModeOff": "Duvar modu kapalı.",
         "nightHoursLabel": "Gece saatleri",
-        "nightHoursHint": "Bu saatlerde duvar modu ve ekran koruyucu, evin saatine göre kararır. Yalnızca bu cihaz için geçerlidir.",
+        "nightHoursHint": "Bu saatlerde, evin saatine göre duvar modu kararır ve ekran koruyucu siyah olur. Yalnızca bu cihaz için geçerlidir.",
         "nightHoursFrom": "Karartma başlangıcı",
         "nightHoursUntil": "Karartma bitişi",
         "nightHoursSaved": "Bu cihazdaki gece saatleri: {{from}} - {{until}}.",

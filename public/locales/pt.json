@@ -2028,7 +2028,7 @@
         "wallModeOn": "Modo parede ativo, visível em {{page}}.",
         "wallModeOff": "Modo parede desativado.",
         "nightHoursLabel": "Horas noturnas",
-        "nightHoursHint": "Nestas horas o modo parede e a proteção de ecrã escurecem, pelo relógio da casa. Aplica-se apenas a este dispositivo.",
+        "nightHoursHint": "Nestas horas o modo parede escurece e a proteção de ecrã fica preta, pelo relógio da casa. Aplica-se apenas a este dispositivo.",
         "nightHoursFrom": "Escurecer a partir de",
         "nightHoursUntil": "Escurecer até",
         "nightHoursSaved": "Horas noturnas neste dispositivo: das {{from}} às {{until}}.",

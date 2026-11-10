@@ -155,14 +155,16 @@ async function start() {
     // Wechsel um 22:00 und 06:00 einen laufenden Schoner ohne Beruehrung und
     // ohne eigenen Takt; die Dimmung selbst steht in screensaver.css.
     const markNight = () => {
-      if (!overlay) return;
-      if (isNightHours()) overlay.dataset.night = '';
+      const night = isNightHours();
+      if (night) overlay.dataset.night = '';
       else delete overlay.dataset.night;
+      return night;
     };
-    markNight();
     const show = () => {
       if (!overlay) return;
-      markNight();
+      // Nachts ist der Schoner schwarz (screensaver.css): kein Foto laden, das
+      // niemand sieht. Der naechste Takt nach dem Ende der Nacht laedt wieder.
+      if (markNight()) return;
       const photo = photos[index++ % photos.length];
       image.classList.remove('photo-screensaver__visible');
       image.onload = () => image.classList.add('photo-screensaver__visible');

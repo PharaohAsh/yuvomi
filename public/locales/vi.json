@@ -2138,7 +2138,7 @@
         "wallModeOn": "Đã bật chế độ treo tường, xem tại {{page}}.",
         "wallModeOff": "Đã tắt chế độ treo tường.",
         "nightHoursLabel": "Giờ ban đêm",
-        "nightHoursHint": "Trong những giờ này, chế độ treo tường và trình bảo vệ màn hình sẽ tối đi, theo giờ của gia đình. Chỉ áp dụng cho thiết bị này.",
+        "nightHoursHint": "Trong những giờ này, chế độ treo tường sẽ tối đi và trình bảo vệ màn hình chuyển sang màu đen, theo giờ của gia đình. Chỉ áp dụng cho thiết bị này.",
         "nightHoursFrom": "Làm tối từ",
         "nightHoursUntil": "Làm tối đến",
         "nightHoursSaved": "Giờ ban đêm trên thiết bị này: từ {{from}} đến {{until}}.",

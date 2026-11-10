@@ -2138,7 +2138,7 @@
         "wallModeOn": "Wandmodus aan, zichtbaar bij {{page}}.",
         "wallModeOff": "Wandmodus uit.",
         "nightHoursLabel": "Nachturen",
-        "nightHoursHint": "Tijdens deze uren dimmen de wandmodus en de schermbeveiliging, volgens de klok van het huishouden. Geldt alleen voor dit apparaat.",
+        "nightHoursHint": "Tijdens deze uren dimt de wandmodus en wordt de schermbeveiliging zwart, volgens de klok van het huishouden. Geldt alleen voor dit apparaat.",
         "nightHoursFrom": "Dimmen vanaf",
         "nightHoursUntil": "Dimmen tot",
         "nightHoursSaved": "Nachturen op dit apparaat: {{from}} tot {{until}}.",
