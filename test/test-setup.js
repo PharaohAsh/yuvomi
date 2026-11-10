@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { startTestServer, cookieHeader } from './server-ready.js';
+import { readDist } from './dist-build.js';
 
 // Start, Portwahl und Abbau liegen im Helfer - inklusive des Grundes, warum
 // hier kein `process.exit(0)` mehr steht.
@@ -59,14 +60,48 @@ test('GET /api/v1/version: setup_required is true when no users exist', async ()
   assert.equal(data.version, undefined);
 });
 
-test('GET /sw.js injects the build revision and forbids intermediary caching', async () => {
+test('GET /api/v1/version: names the product and the client contract without a credential', async () => {
+  const res = await fetch(`${BASE}/api/v1/version`);
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  // `app_name` taugt nicht als Erkennung: ein Haushalt kann ihn umbenennen.
+  assert.equal(data.product, 'yuvomi');
+  // 1: Geraete, Kopplung, kommende Erinnerungen und die 39 Client-Operationen.
+  assert.equal(data.client_api, 1, 'client_api names the contract this server holds');
+  assert.equal(data.version, undefined, 'the exact version stays behind sign-in');
+  assert.equal(data.max_upload_bytes, undefined);
+});
+
+test('GET /sw.js serves the built worker with its revision and forbids intermediary caching', async () => {
+  // Seit dem Build (Phase 1a, Abschnitt D) setzt `npm run build` Revision,
+  // Version und Precache-Liste in dist/sw.js ein; der Server liefert die Datei
+  // so aus und ersetzt nichts mehr (das APP_BUILD_REVISION dieses Servers
+  // aendert sie nicht - das Image baut mit derselben Revision).
   const res = await fetch(`${BASE}/sw.js`);
   const body = await res.text();
 
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('cache-control'), 'no-store, max-age=0');
-  assert.match(body, /const APP_BUILD_REVISION\s*=\s*'acceptance-route-test'/);
-  assert.doesNotMatch(body, /__YUVOMI_BUILD_REVISION__/);
+  assert.equal(body, readDist('sw.js'), 'the server serves dist/sw.js as built');
+  assert.match(body, /^self\.__PRECACHE__ = \[/);
+  assert.match(body, /const APP_BUILD_REVISION = '[A-Za-z0-9._-]{1,80}'/);
+  assert.doesNotMatch(body, /__YUVOMI_(?:BUILD_REVISION|APP_RELEASE)__/);
+});
+
+test('the shell fallback answers only extensionless routes, a missing file is a 404', async () => {
+  // Nach einem Release sind die Chunk-Adressen offener Tabs weg. Bekamen sie
+  // 200 mit index.html, legte der Service Worker (networkFirst) diese HTML-
+  // Seite ueber die gute Precache-Kopie des Chunks (Review auf #2631).
+  for (const path of ['/assets/nicht-da-abc123.js', '/utils/nicht-da.js', '/pages/calendar.js', '/styles/nicht-da.css', '/locales/xx.json']) {
+    const res = await fetch(`${BASE}${path}`, { headers: { accept: '*/*' } });
+    assert.equal(res.status, 404, `${path}: ${res.status} ${res.headers.get('content-type')}`);
+    assert.doesNotMatch(await res.text(), /<!DOCTYPE html>/i, `${path} bekam die Shell`);
+  }
+  for (const path of ['/calendar', '/settings/admin/family', '/m/beispiel', '/health']) {
+    const res = await fetch(`${BASE}${path}`, { headers: { accept: 'text/html' } });
+    assert.equal(res.status, 200, path);
+    assert.match(res.headers.get('content-type') ?? '', /text\/html/, path);
+  }
 });
 
 test('GET /openapi.json: 401 without authentication', async () => {
@@ -133,6 +168,8 @@ test('GET /api/v1/version: includes version for authenticated session', async ()
   const data = await res.json();
   assert.equal(typeof data.version, 'string');
   assert.equal(data.setup_required, false);
+  assert.equal(data.product, 'yuvomi', 'the same fields for a signed-in caller');
+  assert.ok(Number.isInteger(data.client_api));
 });
 
 test('POST /api/v1/auth/setup: 403 when users already exist', async () => {

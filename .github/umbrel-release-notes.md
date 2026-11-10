@@ -1,12 +1,12 @@
-<!-- version: 2.83.0 -->
-This update brings servings to recipes, your own defaults for new tasks and a broad round of fixes across the app.
+<!-- version: 2.87.0 -->
+This update closes several gaps in who may see and receive what, and it makes error messages speak your language.
 
-A recipe can now say how many servings it is for, and a stepper recalculates every amount; planning a meal or adding it to the shopping list takes the servings you chose. New tasks open with the visibility and lock setting you pick under Settings > Tasks. Shared expenses use your budget categories, and recipes mirrored from Mealie now bring their preparation steps along.
+A member whose access to a module was taken away no longer keeps receiving it through the back door. Calendar subscription links, including birthdays, inventory deadlines, cycle, schedule and waste collection, stay empty for somebody set to "no access"; the link itself remains valid and fills again once access is given back. Medication reminders reach only people who may see Health, and they go out by push and to the recipient's own notification channels, never to a channel the whole household shares. A demoted administrator loses the admin role on every device at once, and two administrators demoting each other at the same moment can no longer leave the household without one.
 
-Recurring tasks keep their repeat on a CalDAV server, old daily series show up in the calendar again, and imported calendars take on a new colour when you change it. Amount fields accept a comma or a point, weights in grams and kilograms share one chart, and email with encryption set to "None" now sends. Many smaller fixes make phone layouts, settings and the welcome tour easier to use.
+Settings no longer show raw text from calendar, contact, storage, mail or backup servers. When a connection test or a sync fails, the message names the kind of failure in your language, and technical details stay with the administrator.
 
-A member colour can now only be a real colour. Before, another account in the household could place its own styling on other members' screens through that field.
+Every release now also carries a signed copy of the app as a file next to the container image. For an Umbrel installation nothing changes; the image updates as before.
 
-This update changes the database. The changes are applied automatically on the first start and need no action from you; as always, a backup before updating is a good idea.
+This update does not change the database. No action is needed from you.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.83.0
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.87.0

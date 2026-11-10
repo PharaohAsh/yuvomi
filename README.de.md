@@ -169,6 +169,17 @@ unter *Voraussetzungen, Netzwerk und eure Daten*.
 [Umbrel](https://yuvomi.cloud/install.html#umbrel) oder [Unraid](https://yuvomi.cloud/install.html#unraid):
 im Katalog nach Yuvomi suchen und installieren, ganz ohne Terminal.
 
+**In Home Assistant** auf Home Assistant OS: das Repository
+[ulsklyc/yuvomi-home-assistant](https://github.com/ulsklyc/yuvomi-home-assistant) unter Einstellungen → Apps
+hinzufügen und Yuvomi als App installieren ([Schritte](https://yuvomi.cloud/install.html#homeassistant)).
+
+**Auf YunoHost** ab 12.1.17: `sudo yunohost app install https://github.com/ulsklyc/yuvomi_ynh`
+installiert das [YunoHost-Paket](https://github.com/ulsklyc/yuvomi_ynh), das noch nicht im Katalog
+steht ([Schritte](https://yuvomi.cloud/install.html#yunohost)).
+
+**Auf Proxmox** richtet ein [Community-Helferskript](https://community-scripts.org/scripts/yuvomi)
+mit einem Befehl einen Debian-LXC mit Yuvomi ein ([Schritte](https://yuvomi.cloud/install.html#proxmox)).
+
 **Mit Docker** auf jedem Server. Das Image `ghcr.io/ulsklyc/yuvomi:latest` ist rund 500 MB groß und
 läuft auf amd64 und arm64 (Raspberry Pi 4/5); Yuvomi braucht einen Port, standardmäßig 3000.
 
@@ -183,8 +194,9 @@ openssl rand -hex 32   # DB_ENCRYPTION_KEY
 > **Öffnet jetzt `.env` und ersetzt beide `REPLACE_WITH_…`-Platzhalter** durch die zwei Werte, in
 > dieser Reihenfolge, und schreibt den zweiten auf: er ist der Datenbankschlüssel, und ein
 > verlorener oder geänderter Schlüssel öffnet die Datenbank nie wieder, weder für euch noch für
-> uns. Bleibt ein Platzhalter stehen, startet Yuvomi nicht. Ohne Verschlüsselung: die Zeile
-> `DB_ENCRYPTION_KEY` leeren statt sie zu füllen.
+> uns. Bleibt ein Platzhalter stehen, startet Yuvomi nicht. Oder löscht beide Zeilen, dann erzeugt
+> Yuvomi sie beim ersten Start. Ohne Verschlüsselung: die Zeile `DB_ENCRYPTION_KEY` löschen und
+> `DB_ENCRYPTION_AUTO_KEY=false` setzen.
 
 ```bash
 docker compose up -d
@@ -203,10 +215,12 @@ und die [Installationsanleitung im Repository](docs/installation.md).
 - **Seite lädt nicht** - `docker compose logs` (unter Podman
   `podman compose -f podman-compose.yml logs`) nennt meist den Grund, und die
   [Fehlersuche](docs/installation.md#troubleshooting) deckt die häufigen Fälle ab.
-- **Proxmox** - dieselben Schritte laufen in einem kleinen Debian-LXC: siehe die
+- **Proxmox** - das Community-Helferskript installiert Yuvomi ohne Docker; wer beim Docker-Setup
+  bleibt, fährt dieselben Schritte in einem kleinen Debian-LXC: siehe die
   [Proxmox-Anleitung auf yuvomi.cloud](https://yuvomi.cloud/install.html#proxmox).
-- **Schlüssel** - optional, aber ohne Weg zurück. Die geführte Einrichtung und Umbrel erzeugen ihn
-  für euch; mit Compose, TrueNAS oder Unraid setzt ihr ihn selbst, also schreibt ihn auf.
+- **Schlüssel** - optional, aber ohne Weg zurück. Bleibt er leer, erzeugt eine neue Installation
+  ihn beim ersten Start; ein Admin findet ihn unter Einstellungen → Haushalt → Backup und
+  Wiederherstellung. Schreibt ihn in jedem Fall auf: ohne ihn lassen sich Backups nicht öffnen.
 - **Geführte Einrichtung** - ein lokalisierter Einrichtungsassistent im Browser. Er erkennt Docker
   oder Podman, richtet Single Sign-on und geplante Backups ein, bereitet Yuvomi auf einen
   HTTPS-Reverse-Proxy vor (das Zertifikat bleibt Sache des Proxys), startet dann den Container und
@@ -219,7 +233,7 @@ und die [Installationsanleitung im Repository](docs/installation.md).
 
   Öffnet **http://localhost:8090** auf dem Server selbst; woanders antwortet der Assistent nicht.
   Von einem anderen Gerät aus öffnet ihr zuerst einen Tunnel, `ssh -L 8090:localhost:8090 user@server`,
-  und dann dort dieselbe Adresse. Braucht Node.js 22.14+ oder 23.6+ auf dem Host; der Container
+  und dann dort dieselbe Adresse. Braucht Node.js 24.12 oder neuer auf dem Host; der Container
   bringt sein eigenes Node 24 mit.
 
 </details>
@@ -227,11 +241,11 @@ und die [Installationsanleitung im Repository](docs/installation.md).
 <details>
 <summary><b>Voraussetzungen, Netzwerk und eure Daten</b></summary>
 
-- **Browser** - alles wie vorgesehen ab Chrome und Edge 117, Firefox 129 und Safari 17.5. Bis hinunter zu Chrome 87, Firefox 79 und Safari 14.1 (iOS 14.5) startet und scrollt es noch, schlichter und mit einzelnen fehlenden Funktionen ([gemessen am 21. September 2026](docs/installation.md#browser-support)).
+- **Browser** - Chrome und Edge 105, Firefox 115, Safari 15.4 und iOS 15.4 oder neuer. Ältere Safari- und iOS-Versionen, Chrome vor 99 und Firefox vor 97 bekommen eine Seite, die diese Versionen nennt; Chrome 99 bis 104 und Firefox 97 bis 114 starten mit Lücken ([Details](docs/installation.md#browser-support)).
 - **Schreibt** - vier Volumes, die euch gehören: Daten, Backups, Module, Dokumente.
 - **Nach außen** - von sich aus eine Update-Abfrage an die GitHub-Releases-API. Blockiert sie, und nichts geht kaputt, nur der Hinweis auf eine neuere Version bleibt aus. Alles andere geht erst nach außen, wenn ihr eine Funktion nutzt oder einschaltet, die es braucht:
   - **Wenn ihr sie nutzt** - das Öffnen der Kalender-Einstellungen lädt die Liste der Feiertagsländer von openholidaysapi.org; die Logo-Suche für ein Abo ruft die Website des Dienstes auf.
-  - **Wenn der Betreiber es einschaltet** - das Holen des Profilbilds von Gravatar schickt einen Hash eurer E-Mail-Adresse an gravatar.com oder den vom Betreiber gewählten Spiegel.
+  - **Wenn der Betreiber es einschaltet** - das Holen des Profilbilds von Gravatar schickt einen Hash eurer E-Mail-Adresse an gravatar.com oder den vom Betreiber gewählten Spiegel; ist die Web-Installation erlaubt, kann ein Admin Erweiterungsmodule von GitHub installieren.
   - **Sobald ihr sie einschaltet** - Wetter, Feiertage, Wechselkurse, Kalender- und Kontakte-Sync, Rezept-Spiegel, Immich, Paperless oder Papra, Push- und Benachrichtigungskanäle, Cloud-Speicher und Backup.
 - **Euer LAN** - Kalender-Abos, Benachrichtigungskanäle (Webhook, Gotify, ntfy), WebDAV-Dokumentenspeicher, Rezept-Spiegel und Abfuhr-Feeds unter privaten oder internen Adressen bleiben blockiert, bis ihr sie freigebt ([wie](docs/installation.md#environment-variables)). Paperless und Papra sind die Ausnahme: sie dürfen ab Werk ins LAN.
 - **Eure Daten** - eine SQLite-Datei unter `/data/yuvomi.db`, dazu Ordner, WebDAV oder Drive, falls die Dokumente dort liegen.
@@ -269,7 +283,7 @@ Yuvomi wurde von **Oikos** umbenannt, um einen Markenkonflikt mit einem unabhän
 
 ## Unter der Haube
 
-- **Kein Build-Schritt** - reine ES-Module und einfaches CSS. Kein Bundler, kein Transpiler, kein Framework, kein CDN zur Laufzeit.
+- **Gebaut und trotzdem lesbar** - Vite bündelt die App und liefert sie mit Source Maps aus; es gibt kein Framework, kein CDN zur Laufzeit und keine Telemetrie, jedes Fremdpaket ist gepinnt und aufgelistet, und dieselbe Quelle ergibt dieselben Bytes, so dass sich der Release-Tarball nachbauen und vergleichen lässt ([die fünf Garantien](CONTRIBUTING.md#hard-constraints)).
 - **Fühlt sich an wie eine native App** - gebaut nach Apples Gestaltungsrichtlinien: Systemschrift, Kapsel-Knöpfe, gruppierte Listen und federnde Bewegung, mit in Hell und Dunkel geprüftem WCAG-AA-Kontrast.
 - **Privatsphäre zuerst** - vollständig selbstgehostet, optionale SQLCipher-AES-256-Datenbankverschlüsselung, keine Telemetrie.
 - **Anmeldung für einen ganzen Haushalt** - Zwei-Faktor-Anmeldung, Einladungslinks, optionaler Passwort-Reset per E-Mail und Single Sign-on mit jedem OIDC-Anbieter; siehe [wie sicher der Zugang von außen ist](#bevor-ihr-euch-festlegt).

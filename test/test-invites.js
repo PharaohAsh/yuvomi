@@ -4,7 +4,7 @@
  *        list/cleanup) gegen das echte Migrations-SQL aus v121, dazu die fünf
  *        Einladungs-Routen: Admin-Gate, CSRF, und dass Rolle und Familienrolle
  *        aus der Einladung stammen statt aus dem Body des Eingeladenen.
- * Ausführen: node --experimental-sqlite test/test-invites.js
+ * Ausführen: node test/test-invites.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 // Muss vor dem ersten db.js-Import stehen, sonst legt der Import eine echte
@@ -317,6 +317,23 @@ test('POST /invites weist ungültige Eingaben ab', async () => {
   for (const [body, expected] of cases) {
     const res = await call('POST', '/auth/invites', { actor: ADM, body });
     assert.equal(res.status, expected, `unerwartet für ${JSON.stringify(body)}`);
+  }
+});
+
+// #1909: die beiden Faelle, die ein Admin im Einladungsdialog erreicht (das
+// Feld prueft den Benutzernamen nicht selbst, und ob er vergeben ist, weiss nur
+// der Server), tragen einen `reason`. Die App sagt den Satz dazu
+// (CASE_MESSAGES), nie den englischen `error`.
+test('POST /invites nennt den Fall eines Benutzernamens (#1909)', async () => {
+  for (const [body, status, reason] of [
+    [{ username: 'ab' }, 400, 'members_username_invalid'],
+    [{ username: 'kein leerzeichen' }, 400, 'members_username_invalid'],
+    [{ username: 'admin' }, 409, 'members_username_taken'],
+  ]) {
+    const res = await call('POST', '/auth/invites', { actor: ADM, body });
+    assert.equal(res.status, status, JSON.stringify(body));
+    assert.equal(res.body.reason, reason, JSON.stringify(body));
+    assert.equal(typeof res.body.error, 'string');
   }
 });
 

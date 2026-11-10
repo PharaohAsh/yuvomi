@@ -5,6 +5,9 @@
  */
 
 import './utils/load-file-secrets.js';
+// Vor Sperre und Datenbank: ohne gebaute App (dist/) startet nichts
+// (utils/frontend-dir.js). Der Handschlag oben bleibt der erste Import.
+import { FRONTEND } from './utils/require-frontend.js';
 import './utils/claim-instance-lock.js';
 import express from 'express';
 import helmet from 'helmet';
@@ -20,7 +23,7 @@ import { csrfMiddleware } from './middleware/csrf.js';
 import idempotencyMiddleware from './middleware/idempotency.js';
 import { defaultEmptyBody } from './middleware/empty-body.js';
 import { createRestoreWriteGate, trackAdmittedWrite } from './middleware/restore-gate.js';
-import { runExternalJob } from './utils/restore-state.js';
+import { runExternalJob, waitUntilIdle } from './utils/restore-state.js';
 import { createErrorHandler } from './middleware/error-handler.js';
 import { buildOpenApiSpec } from './openapi.js';
 import * as googleCalendar from './services/google-calendar.js';
@@ -37,7 +40,7 @@ import * as caldavSync from './services/caldav-sync.js';
 import * as outlookCalendar from './services/outlook-calendar.js';
 import * as carddavSync from './services/cardav-sync.js';
 import * as holidays from './services/holidays.js';
-import { startScheduler as startBackupScheduler } from './services/backup-scheduler.js';
+import { startScheduler as startBackupScheduler, stopScheduler as stopBackupScheduler } from './services/backup-scheduler.js';
 import { startScheduler as startSplitExpenseScheduler } from './services/split-expenses-scheduler.js';
 import { startRewardMoneyScheduler } from './services/reward-money-scheduler.js';
 import { startScheduler as startPushScheduler } from './services/push-scheduler.js';
@@ -88,6 +91,7 @@ import displaysRouter from './routes/displays.js';
 import { pairingRouter } from './routes/displays.js';
 import { peopleRouter } from './routes/displays.js';
 import { displayMayAct } from './display-scopes.js';
+import { isSplitGuestAccount, splitGuestMayReach } from './split-guest-scope.js';
 import { DISPLAY_PASSWORD_SENTINEL } from './services/display-accounts.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
@@ -109,6 +113,7 @@ import schedulePreferencesRouter from './routes/schedule-preferences.js';
 import scheduleExtrasRouter from './routes/schedule-extras.js';
 import { sessionModuleAccessRequirement, tokenAccessRequirement, tokenAllows } from './scopes.js';
 import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './permissions.js';
+import { FEED_MODULE, recipientDeniedModules } from './services/reminder-origins.js';
 import { BODY_LIMIT, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './utils/upload-limit.js';
 import { createServiceWorkerResponseLoader } from './utils/service-worker.js';
 import { createStaticAssets } from './utils/static-assets.js';
@@ -120,20 +125,30 @@ const logYuvomi = createLogger('Yuvomi');
 const { version: APP_VERSION } = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf-8')
 );
-const SERVICE_WORKER_PATH = new URL('../public/sw.js', import.meta.url);
+// Der gebaute Worker (dist/sw.js) traegt Version und Revision schon; der
+// Loader ersetzt nur noch, wo das Token steht (utils/service-worker.js).
 const SERVICE_WORKER_OPTIONS = {
   appVersion: APP_VERSION,
   buildRevision: process.env.APP_BUILD_REVISION,
 };
-const getServiceWorkerResponse = createServiceWorkerResponseLoader(
-  SERVICE_WORKER_PATH,
-  SERVICE_WORKER_OPTIONS,
-);
+const getServiceWorkerResponse = FRONTEND.serviceWorker
+  ? createServiceWorkerResponseLoader(FRONTEND.serviceWorker, SERVICE_WORKER_OPTIONS)
+  : null;
 
-// Das prüft die Build-Revision schon beim Start und liefert in der Entwicklung
-// nach einer sw.js-Änderung dennoch die neue Quelle ohne manuellen Neustart.
-getServiceWorkerResponse();
+// Das prüft die Build-Revision schon beim Start und liefert nach einem neuen
+// Build dennoch die neue Datei ohne manuellen Neustart.
+getServiceWorkerResponse?.();
 const DEFAULT_APP_NAME = 'Yuvomi';
+
+// Der Vertrag fuer native Clients, als eine Zahl, die jeder vor der Anmeldung
+// lesen darf. Sie steigt nur, wenn ein Client ohne die Aenderung nicht mehr
+// arbeiten kann - nicht mit jedem Release. Ein Client vergleicht sie, statt die
+// genaue Version zu kennen: die bleibt hinter der Anmeldung, und ein zu alter
+// Server faellt auf, bevor jemand ein Passwort eintippt.
+// 0 heisst: noch kein Vertrag. 1 umfasst die angemeldeten Geraete samt
+// Kopplung (`/auth/devices`), `GET /reminders/upcoming` mit `fires_at` und die
+// 39 Operationen, die test:openapi-client-contract festhaelt.
+const CLIENT_API_VERSION = 1;
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -289,6 +304,9 @@ if (process.env.NODE_ENV === 'production' && process.env.ENABLE_API_DOCS !== 'tr
 // /sw.js wird direkt darunter als no-store-Antwort gerendert.
 // --------------------------------------------------------
 app.get('/sw.js', (_req, res) => {
+  // Unter `npm run dev` gibt es keinen Worker (sw-register.js registriert ihn
+  // dort nicht); die Quelle ohne Precache-Liste soll auch Vite nicht ausliefern.
+  if (!getServiceWorkerResponse) return res.status(404).type('text/plain').send('No service worker under npm run dev.');
   const response = getServiceWorkerResponse();
   res.type(response.contentType);
   res.setHeader('Cache-Control', response.cacheControl);
@@ -297,10 +315,16 @@ app.get('/sw.js', (_req, res) => {
   res.send(response.body);
 });
 
-const PUBLIC_DIR = path.join(import.meta.dirname, '..', 'public');
+// Die gebaute App (Phase 1a, Abschnitt D). public/ bleibt Quelle - und Code,
+// den der Server selbst importiert (public/utils/, public/locales/).
+// Unter `npm run dev` gibt es kein dist/ (oder ein altes): Vite liefert dann
+// das Frontend, und hier fragt jeder Abruf eine Datei, die es nicht gibt, ab -
+// beide Wege unten reichen ihn weiter, die Shell-Route antwortet mit dem Hinweis.
+const STATIC_DIR = FRONTEND.dir ?? path.join(import.meta.dirname, '..', 'dist', '.vite-dev-unused');
+const HASHED_DIR = path.join(STATIC_DIR, 'assets') + path.sep;
 
 /**
- * Header jeder Datei aus public/ - EINE Funktion fuer beide Wege, auf denen sie
+ * Header jeder Datei aus dist/ - EINE Funktion fuer beide Wege, auf denen sie
  * das Haus verlaesst: express.static und die Brotli-Fassung aus dem Speicher
  * (utils/static-assets.js). Sonst traegt dieselbe Adresse je nach Weg ein
  * anderes Cache-Control.
@@ -308,7 +332,12 @@ const PUBLIC_DIR = path.join(import.meta.dirname, '..', 'public');
 function setStaticHeaders(res, filePath, stat) {
   const ext = path.extname(filePath).toLowerCase();
   const isPwaIcon = /\/icons\/(icon-|apple-touch-icon|favicon)/.test(filePath);
-  if (isPwaIcon) {
+  if (filePath.startsWith(HASHED_DIR)) {
+    // Gehashte Chunks (und ihre Sourcemaps): der Name wechselt mit dem Inhalt,
+    // ein Jahr unveraenderlich. Fassaden (/api.js, /i18n.js, /utils/html.js),
+    // HTML, sw.js und die kopierten Dateien bleiben unten bei no-cache.
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  } else if (isPwaIcon) {
     // PWA-Icons müssen bei Deployments sofort aktualisiert werden
     res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   } else if (['.png', '.jpg', '.jpeg', '.ico', '.svg', '.webp', '.woff2', '.woff'].includes(ext)) {
@@ -337,7 +366,7 @@ function setStaticHeaders(res, filePath, stat) {
 
 // STATIC_BROTLI=off schaltet nur die vorkomprimierte Auslieferung ab; die
 // compression()-Middleware oben uebernimmt dann jede Anfrage wie vor R18.
-const staticAssets = createStaticAssets(PUBLIC_DIR, {
+const staticAssets = createStaticAssets(STATIC_DIR, {
   brotli: String(process.env.STATIC_BROTLI || '').trim().toLowerCase() !== 'off',
   setHeaders: setStaticHeaders,
 });
@@ -359,11 +388,11 @@ const staticStoreLimiter = rateLimit({
 Object.defineProperty(staticStoreLimiter, 'name', { value: 'staticStoreLimiter' });
 app.use(staticStoreLimiter, staticAssets.middleware);
 
-app.use(express.static(PUBLIC_DIR, {
+app.use(express.static(STATIC_DIR, {
   etag: true,
   lastModified: true,
   // Kein automatischer Trailing-Slash-Redirect für Verzeichnisse (z. B. /settings →
-  // /settings/), sonst kollidiert das public/settings/-Verzeichnis mit der SPA-Route
+  // /settings/), sonst kollidiert ein settings/-Verzeichnis mit der SPA-Route
   // /settings und der Client-Router landet beim Hard-Load auf dem Dashboard.
   redirect: false,
   setHeaders: setStaticHeaders,
@@ -430,6 +459,9 @@ function buildVersionPayload(includeVersion = false) {
   }
   return {
     ...(includeVersion ? { version: APP_VERSION } : {}),
+    // Fest, anders als `app_name`, den ein Haushalt umbenennen kann.
+    product: 'yuvomi',
+    client_api: CLIENT_API_VERSION,
     app_name: appName,
     setup_required: setupRequired,
     password_reset_enabled: passwordResetEnabled,
@@ -519,14 +551,31 @@ const feedLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// A member's feed follows the member's module permission (#2615). The feeds sit
+// outside `/api/v1`, so the module gate there never reached them, and revoking
+// a permission leaves the feed tokens in place. On `none` - and for an owner
+// that no longer resolves - the feed answers 200 with an EMPTY calendar under
+// the same headers instead of 404: the subscription stays in the calendar app
+// and fills again once the permission is given back (skip, do not delete, as
+// the delivery of reminders since #1289). `read` keeps delivering, an admin is
+// never affected. The household module switch stays deliberately open for
+// feeds (docs/DECISIONS.md).
+function feedModuleDenied(userId, feed) {
+  const denied = recipientDeniedModules(db.get(), userId);
+  return !denied || denied.has(FEED_MODULE[feed]);
+}
+
 app.get('/feed/calendar/:token.ics', feedLimiter, (req, res) => {
   try {
     const userId = icsExport.findUserIdByFeedToken(db.get(), 'calendar_feed_token', req.params.token);
     const localCalendar = userId ? null : findCalendarByFeedToken(db.get(), req.params.token);
     if (!userId && !localCalendar) return res.status(404).type('text/plain').send('Not found');
-    const ics = userId
-      ? icsExport.buildFeed(db.get(), userId)
-      : icsExport.buildCalendarFeed(db.get(), localCalendar.id);
+    // A local calendar's token belongs to the calendar, not to a member: no gate.
+    const ics = !userId
+      ? icsExport.buildCalendarFeed(db.get(), localCalendar.id)
+      : feedModuleDenied(userId, 'calendar')
+        ? icsExport.buildEmptyFeed(db.get())
+        : icsExport.buildFeed(db.get(), userId);
     res.set('Cache-Control', 'private, no-store');
     res.set('Content-Disposition', `inline; filename="${localCalendar ? `yuvomi-${localCalendar.id}.ics` : 'yuvomi.ics'}"`);
     res.type('text/calendar; charset=utf-8').send(ics);
@@ -538,12 +587,14 @@ app.get('/feed/calendar/:token.ics', feedLimiter, (req, res) => {
 
 app.get('/feed/birthdays/:token.ics', feedLimiter, (req, res) => {
   try {
-    if (!birthdayIcs.findUserIdByFeedToken(db.get(), req.params.token)) {
-      return res.status(404).type('text/plain').send('Not found');
-    }
+    const userId = birthdayIcs.findUserIdByFeedToken(db.get(), req.params.token);
+    if (!userId) return res.status(404).type('text/plain').send('Not found');
+    const ics = feedModuleDenied(userId, 'birthdays')
+      ? birthdayIcs.buildEmptyBirthdayFeed(db.get())
+      : birthdayIcs.buildBirthdayFeed(db.get());
     res.set('Cache-Control', 'private, no-store');
     res.set('Content-Disposition', 'inline; filename="yuvomi-birthdays.ics"');
-    res.type('text/calendar; charset=utf-8').send(birthdayIcs.buildBirthdayFeed(db.get()));
+    res.type('text/calendar; charset=utf-8').send(ics);
   } catch (err) {
     log.error('Birthday feed', err);
     res.status(500).type('text/plain').send('Internal error');
@@ -557,9 +608,12 @@ app.get('/feed/inventory-deadlines/:token.ics', feedLimiter, (req, res) => {
     // Auflösen statt nur prüfen, wie beim Kalender-Feed oben: das Token gehört
     // einem Nutzer, damit es einzeln zurückziehbar ist. In den Feed-Inhalt geht
     // die Id nicht ein - Inventar ist Haushaltseigentum ohne Sichtbarkeitsachse.
+    // The id decides only whether the owner still has the module (#2615).
     const userId = inventoryDeadlinesIcs.findUserIdByFeedToken(db.get(), req.params.token);
     if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = inventoryDeadlinesIcs.buildInventoryDeadlinesFeed(db.get());
+    const ics = feedModuleDenied(userId, 'inventory-deadlines')
+      ? inventoryDeadlinesIcs.buildEmptyInventoryDeadlinesFeed(db.get())
+      : inventoryDeadlinesIcs.buildInventoryDeadlinesFeed(db.get());
     res.set('Cache-Control', 'private, no-store');
     res.set('Content-Disposition', 'inline; filename="yuvomi-inventory-deadlines.ics"');
     res.type('text/calendar; charset=utf-8').send(ics);
@@ -573,20 +627,21 @@ app.get('/feed/inventory-deadlines/:token.ics', feedLimiter, (req, res) => {
 // oben ist der INHALT hier schon personengebunden (cycle_periods.user_id),
 // nicht nur das Token; siehe server/services/cycle-ics.js.
 //
-// BEWUSST UNGEGATET GEGEN DEN ZYKLUS-TAB/HEALTH-MODUL: server/services/
-// cycle-reminders.js stellt den Erinnerungs-Sync ein, sobald das Health-Modul
-// 'none' ist oder der Zyklus-Tab gesperrt wurde (Haushalt oder persönlich,
-// healthCycleViews()) - dieser Feed lässt sich davon nicht abschalten. Kein
-// Leck: der Inhalt bleibt der des Token-Besitzers selbst, kein Dritter sieht
-// je etwas Fremdes. Gleiche Lücke wie beim Inventar-Feed oben, dieselbe
-// Antwort - ein bestehendes Abo (Kalender-App auf einem anderen Gerät) soll
-// nicht stillschweigend leerlaufen, nur weil die Ansicht in der App gerade
-// gesperrt ist; Abschalten bleibt "Feed deaktivieren" in den Einstellungen.
+// THE VIEW LOCK DOES NOT GATE THIS FEED, THE REVOKED MODULE DOES (#2615).
+// server/services/cycle-reminders.js stops the reminder sync once the cycle
+// tab is locked (household or personal, healthCycleViews()); this feed keeps
+// delivering then - the content is the token owner's own, and an existing
+// subscription on another device should not run empty just because the view
+// is locked in the app; switching it off stays "disable feed" in the settings.
+// `health: none` is a different thing: an administrative decision about the
+// member, and it empties the feed like every other one (feedModuleDenied()).
 app.get('/feed/cycle/:token.ics', feedLimiter, (req, res) => {
   try {
     const userId = cycleIcs.findUserIdByFeedToken(db.get(), req.params.token);
     if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = cycleIcs.buildCycleFeed(db.get(), userId);
+    const ics = feedModuleDenied(userId, 'cycle')
+      ? cycleIcs.buildEmptyCycleFeed(db.get())
+      : cycleIcs.buildCycleFeed(db.get(), userId);
     res.set('Cache-Control', 'private, no-store');
     res.set('Content-Disposition', 'inline; filename="yuvomi-cycle.ics"');
     res.type('text/calendar; charset=utf-8').send(ics);
@@ -604,7 +659,9 @@ app.get('/feed/schedule/:token.ics', feedLimiter, (req, res) => {
   try {
     const userId = scheduleIcs.findUserIdByFeedToken(db.get(), req.params.token);
     if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = scheduleIcs.buildScheduleFeed(db.get(), userId);
+    const ics = feedModuleDenied(userId, 'schedule')
+      ? scheduleIcs.buildEmptyScheduleFeed(db.get())
+      : scheduleIcs.buildScheduleFeed(db.get(), userId);
     res.set('Cache-Control', 'private, no-store');
     res.set('Content-Disposition', 'inline; filename="yuvomi-schedule.ics"');
     res.type('text/calendar; charset=utf-8').send(ics);
@@ -622,7 +679,9 @@ app.get('/feed/waste/:token.ics', feedLimiter, (req, res) => {
   try {
     const userId = wasteIcs.findUserIdByFeedToken(db.get(), req.params.token);
     if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = wasteIcs.buildWasteFeed(db.get(), userId);
+    const ics = feedModuleDenied(userId, 'waste')
+      ? wasteIcs.buildEmptyWasteFeed(db.get())
+      : wasteIcs.buildWasteFeed(db.get(), userId);
     res.set('Cache-Control', 'private, no-store');
     res.set('Content-Disposition', 'inline; filename="yuvomi-waste.ics"');
     res.type('text/calendar; charset=utf-8').send(ics);
@@ -651,13 +710,12 @@ app.use('/api/v1', trackAdmittedWrite);
 app.use('/api/v1/changelog', changelogRouter);
 app.use('/api/v1', (req, res, next) => {
   try {
-    const guest = db.get().prepare('SELECT 1 FROM split_expense_guest_users WHERE user_id = ?').get(req.authUserId);
-    if (!guest) return next();
-    const allowed = req.path.startsWith('/split-expenses')
-      || req.path === '/auth/me'
-      || req.path === '/auth/logout'
-      || req.path === '/version';
-    if (allowed) return next();
+    if (!isSplitGuestAccount(db.get(), req.authUserId)) return next();
+    // Die Liste steht in server/split-guest-scope.js, weil der Auth-Router sie
+    // ebenso fragt (GHSA-q7gc-2cc9-w8fj): er haengt vor diesem Gate, eine
+    // `/auth`-Anfrage kommt hier nie an. Die frueheren Eintraege fuer
+    // `/auth/me`, `/auth/logout` und `/version` waren aus demselben Grund tot.
+    if (splitGuestMayReach(req.method, req.path)) return next();
     return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403, reason: 'split_guest_scope' });
   } catch {
     return res.status(403).json({ error: 'This account can only access Shared expenses.', code: 403, reason: 'split_guest_scope' });
@@ -878,7 +936,19 @@ app.get('/{*path}', spaLimiter, (req, res) => {
   // Segment des absoluten Pfads auf Dotfiles pruefen - liegt der Checkout unter
   // einem Dot-Verzeichnis (z. B. ~/.claude/...), liefert jede Deep-URL 500.
   // Mit root prueft `send` nur den relativen Teil ('index.html').
-  res.sendFile('index.html', { root: path.join(import.meta.dirname, '..', 'public') });
+  if (FRONTEND.mode === 'vite-dev') {
+    return res.status(404).type('text/plain').send('npm run dev: the app is served by Vite on http://localhost:5173');
+  }
+  // Die Shell nur fuer Routen der App: ohne Dateiendung und nicht unter
+  // /assets/. Eine fehlende Datei ist ein 404 - nach einem Release sind die
+  // Chunk-Adressen offener Tabs weg, und ein 200 mit index.html legte der
+  // Service Worker ueber die gute Precache-Kopie (Review auf #2631). Dieselbe
+  // Grenze zieht isAppRouteNavigation() in sw.js.
+  const lastSegment = req.path.slice(req.path.lastIndexOf('/') + 1);
+  if (req.path.startsWith('/assets/') || /\.[a-z0-9]+$/i.test(lastSegment)) {
+    return res.status(404).type('text/plain').send('Not found.');
+  }
+  res.sendFile('index.html', { root: STATIC_DIR });
 });
 
 // --------------------------------------------------------
@@ -1002,6 +1072,61 @@ const server = app.listen(PORT, BIND_ADDRESS, () => {
   startRecipeProviderScheduler();
   startWasteSourceScheduler();
 });
+
+// --------------------------------------------------------
+// Sauber beenden (SIGTERM, SIGINT)
+// --------------------------------------------------------
+// Im Container laeuft dieser Prozess als PID 1, und fuer PID 1 ignoriert Linux
+// jedes Signal ohne Handler: `docker stop` und `podman stop` warteten ihre zehn
+// Sekunden ab und schickten dann SIGKILL - mitten in Anfragen, Syncs und
+// Backups, und das Journal blieb liegen. Ausserhalb eines Containers endete der
+// Prozess sofort, ebenso ohne die Datenbank zu schliessen.
+//
+// Erst hier registriert, nach dem Oeffnen der Datenbank: solange der Server auf
+// die Instanzsperre wartet (#1530), haengt `init()` synchron, und ein Handler
+// kaeme nie dran. Dort soll ein Signal weiter beenden wie bisher.
+//
+// Die Frist bleibt unter den zehn Sekunden von Docker und Podman, damit das
+// Schliessen der Datenbank auch dann noch drankommt, wenn ein Sync haengt.
+const SHUTDOWN_TIMEOUT_MS = 8_000;
+let shuttingDown = false;
+
+async function shutdown(signal) {
+  if (shuttingDown) {
+    logYuvomi.warn(`${signal} received again - exiting without waiting.`);
+    process.exit(1);
+  }
+  shuttingDown = true;
+  logYuvomi.info(`${signal} received - shutting down.`);
+  const deadline = Date.now() + SHUTDOWN_TIMEOUT_MS;
+
+  stopBackupScheduler();
+
+  // Keine neuen Verbindungen; laufende Anfragen kommen zu Ende. Eine
+  // Keep-alive-Verbindung (jeder Browser haelt eine) hielte `close()` sonst
+  // bis zu ihrem Timeout offen, auch nach ihrer letzten Antwort (gemessen:
+  // fuenf Sekunden) - deshalb wird sie zugemacht, sobald sie ruht.
+  let httpOpen = true;
+  const httpClosed = new Promise((resolve) => server.close(() => { httpOpen = false; resolve(); }));
+  server.closeIdleConnections();
+  const idleSweep = setInterval(() => server.closeIdleConnections(), 250);
+  const requestsDone = await waitUntilIdle(() => (httpOpen ? [httpClosed] : []), deadline);
+  clearInterval(idleSweep);
+  if (!requestsDone) server.closeAllConnections();
+
+  let clean = false;
+  try {
+    clean = (await db.closeForShutdown(deadline)) && requestsDone;
+  } catch (err) {
+    log.error('Closing the database failed:', err.message);
+  }
+  if (clean) logYuvomi.info('Shutdown complete.');
+  else logYuvomi.warn('Shut down before everything had finished - work still running was cut off.');
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => { shutdown('SIGTERM'); });
+process.on('SIGINT', () => { shutdown('SIGINT'); });
 
 export default app;
 

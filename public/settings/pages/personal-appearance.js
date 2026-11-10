@@ -8,6 +8,7 @@ import {
 } from '/i18n.js';
 import { api } from '/api.js';
 import { esc } from '/utils/html.js';
+import { nightHourOptions } from '/settings/night-hour-options.js';
 import { currencyName, currencyShortLabel, persistCurrencySelection } from '/settings/currency.js';
 import { CURRENCY_CODES } from '/utils/currency-codes.js';
 import { getPreferences, resetPreferencesCache, savePreferences } from '/settings/preferences-cache.js';
@@ -368,6 +369,7 @@ export function screensaverIdleOptions() {
 }
 
 // Seconds below a minute, minutes from there, in the UI language like the delay.
+/** @param {number} seconds */
 function screensaverSlideText(seconds) {
   return seconds < 60
     ? formatUnit(seconds, 'second', { unitDisplay: 'long' })
@@ -378,13 +380,14 @@ function screensaverSlideText(seconds) {
 // value.
 export function screensaverSlideOptions() {
   const current = getScreensaverSlideSeconds();
-  return SCREENSAVER_SLIDE_STEPS.map((seconds) => `
+  return SCREENSAVER_SLIDE_STEPS.map((/** @type {number} */ seconds) => `
     <option value="${seconds}"${seconds === current ? ' selected' : ''}>${esc(screensaverSlideText(seconds))}</option>`).join('');
 }
 
 /**
  * Time per photo: read at the next start like the switches below, so the same
  * toast. Exported so test:screensaver-device can drive the real handler.
+ * @param {{ value: string, addEventListener(type: 'change', listener: () => void): void } | null | undefined} select
  */
 export function bindScreensaverSlideSelect(select) {
   select?.addEventListener('change', () => {
@@ -431,10 +434,7 @@ function nightHourText(hour) {
  * setting does not offer. Exported so test:screensaver-device can check the
  * selects open on the stored value.
  */
-export function nightHourOptions(selected, other) {
-  return Array.from({ length: 24 }, (_, hour) => `
-    <option value="${hour}"${hour === selected ? ' selected' : ''}${hour === other ? ' disabled' : ''}>${esc(nightHourText(hour))}</option>`).join('');
-}
+export { nightHourOptions };
 
 /**
  * Device-local like wall mode (#2234): no server request. Wall and

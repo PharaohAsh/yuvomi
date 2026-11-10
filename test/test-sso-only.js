@@ -2,7 +2,7 @@
  * Modul: SSO als einziger Weg hinein (#847)
  * Zweck: Der Schalter `AUTH_ALLOW_PASSWORD_LOGIN`, Konten ohne Passwort und die
  *        Loecher, die beide im Passwort-Reset aufreissen wuerden.
- * Ausfuehren: node --experimental-sqlite test/test-sso-only.js
+ * Ausfuehren: node test/test-sso-only.js
  *
  * Warum eine eigene Suite und nicht ein Kapitel in test-oidc.js: die Regeln
  * hier gelten fuer die EINGEBAUTE Anmeldung. Dass OIDC ueber ihr Wirksamwerden
@@ -589,7 +589,8 @@ test('nur die Absage wegen abgeschalteter Anmeldung zeichnet neu', () => {
   // pauschales Neuzeichnen verschluckte diese dauerhafte Absage und stellte den
   // Nutzer vor dasselbe Formular, ohne ihm je den Grund zu nennen.
   const login = readFileSync(new URL('../public/pages/login.js', import.meta.url), 'utf8');
-  assert.match(login, /err\.status === 403 && \/password login is disabled\/i\.test/);
+  // Erkannt am Grund, nicht am englischen Text (#1909).
+  assert.match(login, /err\.status === 403 && err\.data\?\.reason === 'password_login_disabled'/);
   assert.match(login, /accountCannotSignIn/,
     'die andere 403-Absage braucht eine eigene Meldung, kein "Verbindungsproblem"');
 });

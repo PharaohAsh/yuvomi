@@ -139,8 +139,9 @@ test('docs/installation.md: kein Copy-Block legt die .env an und startet', () =>
     + 'Secrets erzeugen, .env von Hand fuellen, dann erst in einem eigenen Block starten.');
   // Ohne diese Vorbedingung waere der Test gruen, weil es gar keinen
   // Kurzweg mehr gibt, den er pruefen koennte.
-  const quick = md.split(/^### /m).find((s) => /^Option C .*Manual/.test(s));
-  assert.ok(quick, 'Abschnitt "Option C - Manual" nicht gefunden - Muster veraltet?');
+  // Seit #2582 ohne Optionsbuchstaben: die zaehlt nur die Schritt-fuer-Schritt-Liste.
+  const quick = md.split(/^### /m).find((s) => /^Manual \(Docker or Podman/.test(s));
+  assert.ok(quick, 'Abschnitt "Manual (Docker or Podman ...)" im Quick Install nicht gefunden - Muster veraltet?');
   assert.match(quick, /openssl rand -hex 32/, 'Der Kurzweg sagt nicht, wie man die Secrets erzeugt.');
   assert.match(quick, /REPLACE_WITH_/, 'Der Kurzweg nennt den Platzhalter nicht, den man ersetzen muss.');
 });
@@ -445,8 +446,9 @@ test('der Gruppen-Guard erkennt den Schaden, gegen den er gebaut ist', () => {
   const oldForm = groupFindings(md.replace(summary, `${asList}\n<details>\n<summary><b>Every module in one line</b></summary>`), html, 'en');
   assert.ok(hit(oldForm, /0 Gruppenzeilen, die Homepage zeigt 5 Gruppen/), oldForm.join(' | '));
   // Die Homepage bekommt ein Modul, das die Gruppenzeilen nicht kennen.
-  const more = html.replace('<h4 data-t="m_backup_t">', '<h4 data-t="m_backup_t">x</h4></div><div class="mod-card"><h4 data-t="m_bday_t">');
-  assert.notEqual(more, html, 'Vorbedingung: m_backup_t steht als <h4> im Markup');
+  // Seit S4 (Critique 2026-10-30) steht der Name in einem <span> der <h4>, neben dem Symbol.
+  const more = html.replace('<span data-t="m_backup_t">', '<span data-t="m_backup_t">x</span></h4></div><div class="mod-card"><h4><span data-t="m_bday_t">');
+  assert.notEqual(more, html, 'Vorbedingung: m_backup_t steht als Name einer <h4> im Markup');
   assert.ok(hit(groupFindings(md, more, 'en'), /Gruppe "Settings"/));
 });
 
@@ -564,6 +566,25 @@ for (const lang of Object.keys(READMES)) {
     // leere Logo durch (Gegenprobe 2026-09-30).
     const nameless = imgs.filter((tag) => !(tag.match(/\balt="([^"]*)"/)?.[1] || '').trim());
     assert.deepEqual(nameless, [], 'Bilder ohne Alt-Text (GitHub verlinkt sie, der Link bliebe namenlos)');
+  });
+
+  // (7) Phase 1a (November 2026): die App wird gebaut ausgeliefert, und die
+  // Mindestversion von Node ist 24.12. Der Satz "No build step" und jede Node-
+  // Zahl unter 24 waren bis dahin wahr und stehen seitdem als Behauptung im
+  // Weg: wer sie liest, baut nicht und wundert sich ueber einen Server, der
+  // ohne dist/ nicht startet. Rot gegen main vor dem Regelwerk-PR (Abschnitt F).
+  test(`${READMES[/** @type {keyof typeof READMES} */ (lang)]}: kein "No build step" und keine Node-Version unter 24`, () => {
+    const text = readme(lang);
+    const claims = text.split('\n')
+      .map((line, i) => (/\b(no|kein|ohne)\s+build[- ]?(step|schritt)\b/i.test(line) ? `${i + 1}: ${line.trim()}` : null))
+      .filter(Boolean);
+    assert.deepEqual(claims, [],
+      'Die App wird seit Phase 1a gebaut ausgeliefert (CONTRIBUTING.md, "Hard Constraints" und "Build"):\n  ' + claims.join('\n  '));
+    const nodes = [...text.matchAll(/\bNode(?:\.js)?\s+(\d+)(?:\.(\d+))?/g)]
+      .filter((m) => Number(m[1]) < 24 || (Number(m[1]) === 24 && m[2] !== undefined && Number(m[2]) < 12))
+      .map((m) => m[0]);
+    assert.deepEqual(nodes, [],
+      'engines.node in package.json ist ^24.12.0 || >=26.0.0; die README nennt eine aeltere Version: ' + nodes.join(', '));
   });
 
   test(`${READMES[lang]}: kein Em- oder En-Dash`, () => {

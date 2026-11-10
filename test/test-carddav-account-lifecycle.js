@@ -6,7 +6,7 @@
  *        2. Es gab kein PUT auf Konten: ein rotiertes Passwort bedeutete löschen
  *           und neu anlegen, samt Verlust der Adressbuch-Auswahl.
  *        3. Sammelschalter „alle an/aus" fährt über dieselbe Toggle-Route.
- * Ausführen: node --experimental-sqlite test/test-carddav-account-lifecycle.js
+ * Ausführen: node test/test-carddav-account-lifecycle.js
  */
 
 import os from 'node:os';
@@ -207,7 +207,7 @@ try {
     const routerSrc = readFileSync(path.join(here, '..', 'server/routes/cardav.js'), 'utf8');
     assert(!/Interner Fehler|nicht gefunden|existiert bereits/.test(routerSrc), 'deutsche Klartexte im Router');
     assert(/errorCode: 'account_duplicate'|'account_duplicate'/.test(routerSrc), 'Konflikt-Code fehlt');
-    assert(/function errorMessage\(err\)/.test(pageSrc), 'Client übersetzt Fehlercodes nicht');
+    assert(/function errorMessage\(err\b/.test(pageSrc), 'Client übersetzt Fehlercodes nicht');
     assert(/cardavErrorDuplicate/.test(pageSrc), 'Übersetzungsschlüssel fehlt');
   });
 
