@@ -25,6 +25,7 @@ function idleMs() {
 let idleTimer;
 let slideTimer;
 let clockTimer;
+/** @type {HTMLDivElement | undefined} */
 let overlay;
 let run = 0;
 // When the last counted pointermove was; see the listener and preview().
@@ -147,24 +148,22 @@ async function start() {
     document.body.append(overlay);
 
     let index = Math.floor(Math.random() * photos.length);
-    // NACHTS GEDIMMT, AUCH OHNE WAND (#1901). Die Nachtstunden dieses Geraets
+    // NACHTS SCHWARZ, AUCH OHNE WAND (#1901). Die Nachtstunden dieses Geraets
     // (utils/night-hours.js) - dieselben, in denen die Wand abdunkelt, aber
     // nicht an `data-wall-night` gebunden: das gibt es nur im Wand-Modus auf
     // `/`, und ein Tablet ohne Wand-Modus oder auf einer anderen Seite stuende
     // um drei Uhr hell im Flur. Gefragt bei jedem Bildwechsel, so erreicht der
     // Wechsel um 22:00 und 06:00 einen laufenden Schoner ohne Beruehrung und
-    // ohne eigenen Takt; die Dimmung selbst steht in screensaver.css.
-    const markNight = () => {
-      const night = isNightHours();
-      if (night) overlay.dataset.night = '';
-      else delete overlay.dataset.night;
-      return night;
-    };
+    // ohne eigenen Takt; das Schwarz selbst steht in screensaver.css.
     const show = () => {
       if (!overlay) return;
       // Nachts ist der Schoner schwarz (screensaver.css): kein Foto laden, das
       // niemand sieht. Der naechste Takt nach dem Ende der Nacht laedt wieder.
-      if (markNight()) return;
+      if (isNightHours()) {
+        overlay.dataset.night = '';
+        return;
+      }
+      delete overlay.dataset.night;
       const photo = photos[index++ % photos.length];
       image.classList.remove('photo-screensaver__visible');
       image.onload = () => image.classList.add('photo-screensaver__visible');

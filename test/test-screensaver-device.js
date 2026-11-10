@@ -145,6 +145,12 @@ const pageRoot = {
 const overlay = () => body.children.find((node) => node.className === 'photo-screensaver');
 const caption = (node) => node.children.find((child) => child.tag === 'p' && !child.className);
 const clockOf = (node) => node.children.find((child) => child.className === 'photo-screensaver__clock');
+/** @param {{ children: Array<{ tag: string, src?: string }> }} node */
+const imageOf = (node) => {
+  const image = node.children.find((child) => child.tag === 'img');
+  assert.ok(image, 'the screensaver has its image');
+  return image;
+};
 const gesture = () => {
   for (const handler of listeners.pointerdown) handler({ preventDefault() {}, stopImmediatePropagation() {} });
 };
@@ -746,21 +752,21 @@ test('the screensaver goes black at night without wall mode, and the hour turns 
   setZone('UTC');
   try {
     const hour = new Date().getUTCHours();
-    const image = (node) => node.children.find((child) => child.tag === 'img');
     // A window that holds the current hour, and then one that does not.
     night.setNightHours(hour, (hour + 2) % 24);
     const node = await openScreensaver();
     assert.equal(node.dataset.night, '', 'black from the start');
-    assert.equal(image(node).src, undefined, 'and no photo loaded for a black screen');
+    assert.equal(imageOf(node).src, undefined, 'and no photo loaded for a black screen');
     night.setNightHours((hour + 3) % 24, (hour + 5) % 24);
     mock.timers.tick(20_000);
     assert.equal('night' in node.dataset, false, 'the next tick is back to full brightness, without a touch');
-    const daySrc = image(node).src;
+    const daySrc = imageOf(node).src;
+    assert.ok(daySrc, 'a photo is loaded by day');
     assert.match(daySrc, /^\/api\/v1\/screensaver\/photos\//, 'with a photo');
     night.setNightHours(hour, (hour + 2) % 24);
     mock.timers.tick(20_000);
     assert.equal(node.dataset.night, '', 'and goes black again on the next tick');
-    assert.equal(image(node).src, daySrc, 'without loading another photo');
+    assert.equal(imageOf(node).src, daySrc, 'without loading another photo');
     gesture();
   } finally {
     night.setNightHours(22, 6);
