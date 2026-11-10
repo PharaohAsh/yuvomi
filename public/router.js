@@ -10,7 +10,7 @@ import { setExtensionModules, selectThirdPartyModuleList } from '/utils/extensio
 import { initExtensionI18n, moduleDisplayLabel, reloadExtensionLocales } from '/utils/extension-i18n.js';
 import { clearApiCache, onServiceWorkerUpdate, UPDATE_RELOAD_DELAY_MS } from '/sw-register.js';
 import { forgetLayoutHint } from '/utils/dashboard-layout-hint.js';
-import { initI18n, getLocale, t, formatTime } from '/i18n.js';
+import { initI18n, getLocale, t, formatTime, setWeekStart } from '/i18n.js';
 import { dateText } from '/utils/date-format.js';
 import { esc } from '/utils/html.js';
 import { initials } from '/utils/initials.js';
@@ -34,6 +34,7 @@ import { numberLocaleFor } from '/settings/region-presets.js';
 import { setDisplayTimeZone, zonedDateKey } from '/utils/timezone.js';
 import { rememberZonePrefs, forgetZonePrefs, noteZoneDecision } from '/utils/household-zone-hint.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
+import { ensurePopoverApi } from '/utils/popover-support.js';
 import { swapPage, swapTheme } from '/utils/view-transition.js';
 import { moduleAccentToken, moduleAccentVar } from '/utils/module-accent.js';
 import { brandMarkSvg } from '/utils/brand-mark.js';
@@ -78,6 +79,7 @@ import {
   noteRestoringScroll,
 } from '/utils/scroll-restore.js';
 import { openModal, confirmModal, closeModal } from '/components/modal.js';
+import { createDisplaySettingsSync } from '/utils/display-settings-sync.js';
 import { armScreensaver, disarmScreensaver } from '/components/photo-screensaver.js';
 import { installPopoverMenus } from '/utils/popover-menu.js';
 import { placeSidebarNavItems, splitPinnedNavItems } from '/utils/sidebar-pinned.js';
@@ -479,6 +481,52 @@ function settleClosingOverlays() {
 const moduleCache = new Map();
 
 // --------------------------------------------------------
+// Seitenmodule im Build (Phase 1a, Abschnitt D). `import(route.page)` mit einem
+// Variablenpfad kann Vite nicht verfolgen; `import.meta.glob` nennt ihm jede
+// Datei unter pages/, und der Build legt sie als eigene, gehashte Chunks ab.
+// Die Tabelle ROUTES behaelt ihre Quellpfade: sie sind die Schluessel hier
+// ('.' + route.page) und in der Adressliste, die der Build in index.html legt
+// (#yuvomi-page-urls, scripts/build/vite-plugins.ts), damit das Vorwaermen
+// (`modulepreload`) die gebaute Datei trifft. Ein Pfad ohne Loader ist ein
+// Drittmodul unter /api/v1/modules/assets/ und laedt wie bisher.
+// --------------------------------------------------------
+const PAGE_LOADERS = import.meta.glob('./pages/*.js');
+
+/** @type {Record<string, string> | null} */
+let _pageUrls = null;
+
+/**
+ * Die ausgelieferte Adresse eines Seitenmoduls: im Build die gehashte Datei
+ * aus der Liste in index.html, unter `vite dev` (keine Liste) die Quelle.
+ * @param {string} pagePath
+ * @returns {string}
+ */
+function pageModuleUrl(pagePath) {
+  if (_pageUrls === null) {
+    try {
+      _pageUrls = JSON.parse(document.getElementById('yuvomi-page-urls')?.textContent || '{}');
+    } catch {
+      _pageUrls = {};
+    }
+  }
+  // Die Liste ist DOM-Text und landet in `link.href` (CodeQL: DOM-Text als
+  // Adresse). Der Build schreibt nur Chunks unter /assets/ (vite.config.ts,
+  // Rolldown-Standard `assets/[name]-[hash].js`); alles andere, auch eine
+  // eingeschleuste Adresse, faellt auf den Quellpfad der Route zurueck.
+  const built = Object.prototype.hasOwnProperty.call(_pageUrls ?? {}, pagePath) ? _pageUrls?.[pagePath] : null;
+  return typeof built === 'string' && /^\/assets\/[A-Za-z0-9_-][A-Za-z0-9._-]*\.js$/.test(built) ? built : pagePath;
+}
+
+/**
+ * @param {string} pagePath
+ * @returns {Promise<any>}
+ */
+function loadPageModule(pagePath) {
+  const load = PAGE_LOADERS[`.${pagePath}`];
+  return load ? load() : import(/* @vite-ignore */ pagePath);
+}
+
+// --------------------------------------------------------
 // Veraltete Shell nach SW-Update (#616)
 //
 // Der Browser führt pro Dokument genau eine Modul-Map. Ist ein geteiltes Modul
@@ -533,7 +581,7 @@ async function importPage(pagePath) {
   }
   if (!moduleCache.has(pagePath)) {
     try {
-      moduleCache.set(pagePath, await import(pagePath));
+      moduleCache.set(pagePath, await loadPageModule(pagePath));
     } catch (err) {
       moduleCache.delete(pagePath);
       // Zweiter Rettungsanker: das Update kam ohne Vorankündigung durch (der
@@ -573,7 +621,7 @@ function prefetchRoute(path, { now = false, priority = null } = {}) {
     _prefetchedPages.add(route.page);
     const link = document.createElement('link');
     link.rel = 'modulepreload';
-    link.href = route.page;
+    link.href = pageModuleUrl(route.page);
     // modulepreload laedt mit hoher Prioritaet. Das Vorwaermen im Leerlauf
     // (warmPrimaryRoutes, rund 19 Module) gibt `low` mit, damit es nichts
     // verdraengt, was die offene Seite gerade braucht; ohne Unterstuetzung
@@ -865,7 +913,7 @@ const offlineSession = createOfflineSession({
     routerState._preferencesLoaded = false;
     await syncPreferencesOnce();
     if (!routerState.currentUser) return;
-    startThirdPartyModulePolling();
+    startSessionPolling();
     if (!['split_guest', 'display'].includes(routerState.currentUser.access_scope)) {
       loadReminderStyles();
       initReminders();
@@ -880,7 +928,7 @@ const navigate = createNavigate(routerState, {
   ROUTES, allRoutes, unknownPathDetour, publicPathDetour, detourPaths, canAccessNavModule,
   location, history, window, document,
   hasLeaveGuard, mayLeave, whenHistorySettled, consumeOverlayMarker,
-  auth: startHandoff.auth, syncPreferencesOnce, startThirdPartyModulePolling, loadReminderStyles, initReminders, initPush: initPushAndReport,
+  auth: startHandoff.auth, syncPreferencesOnce, startSessionPolling, loadReminderStyles, initReminders, initPush: initPushAndReport,
   armScreensaver, forgetSessionState,
   holdOfflineSession: () => offlineSession.start(),
   // Nur ein 401 fuehrt zur Anmeldung; jeder andere Fehler der Sitzungspruefung
@@ -977,12 +1025,17 @@ function applyStartPreferences(res) {
   if (timeFormat) {
     localStorage.setItem('yuvomi-time-format', timeFormat);
   }
+  // Der Wochenstart fuer Komponenten ohne eigene Abfrage, allen voran den
+  // Datepicker (#2533). Fehlt er in der Antwort, bleibt der letzte Stand.
+  if (res?.data?.week_start) setWeekStart(res.data.week_start);
   // Die Haushaltszone in die Anzeige spiegeln (#829 Teil 3). Bewusst
   // `timezone` und nicht `timezone_effective`: letzteres ist nie leer und
   // traegt ohne Einstellung die `TZ` des Containers - ein Compose-Schalter,
   // der nichts darueber aussagt, wo dieser Haushalt lebt. Ohne getroffene
   // Wahl bleibt die Anzeige also beim Browser, so wie bisher.
   setDisplayTimeZone(res?.data?.timezone ?? null);
+  displaySettingsSync.apply(routerState.currentUser?.access_scope === 'display' ? res?.data?.display_device_settings : null);
+
   // Der Zonen-Hinweis der Uebersicht (#1607) liest genau diese Antwort: sie
   // ist da, bevor die erste Seite zeichnet, also steht er schon neben dem
   // Skelett und schiebt nichts nach.
@@ -1039,6 +1092,13 @@ function moduleSnapshot() {
     path: module.route?.path,
     label: module.menu?.label,
   })));
+}
+
+const displaySettingsSync = createDisplaySettingsSync();
+
+function startSessionPolling() {
+  if (routerState.currentUser?.access_scope === 'display') displaySettingsSync.start();
+  else startThirdPartyModulePolling();
 }
 
 function startThirdPartyModulePolling() {
@@ -5410,6 +5470,7 @@ function forgetSessionState() {
   // Anmeldeseite stehen.
   closeAllOverlays();
   stopThirdPartyModulePolling();
+  displaySettingsSync.stop();
   stopReminders();
   stopPush();
   // Die zuletzt geoeffneten Orte der Palette (R19): Ziele eines Kontos
@@ -5749,6 +5810,11 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
     // der catch unten ausdruecklich als unkritisch behandelt. Wer spaeter auf
     // die Antwort wartet, sieht den Fehler trotzdem.
     version.catch(() => {});
+    // DIE POPOVER-API, WO SIE FEHLT (Phase 1a E): Chrome 105-113, Firefox
+    // 115-124 und Safari 15.4-16 haben sie nicht, und ohne sie oeffnet kein
+    // Menue. Der Polyfill laedt parallel zu den Sprachdateien und steht vor
+    // dem ersten Seitenaufbau; ein Browser mit der API laedt nichts davon.
+    const popoverReady = ensurePopoverApi();
     const startRoute = ROUTES.find((r) => r.path === location.pathname);
     if (!startRoute || startRoute.requiresAuth) {
       startHandoff.askSession();
@@ -5768,6 +5834,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
     } catch {
       routerState._setupRequired = false; // Fail-safe: kein Setup erzwingen
     }
+    await popoverReady;
     // Was die erste Navigation nicht abgeholt hat, verfaellt mit ihr: eine
     // spaetere Anmeldung faende sonst die Antwort einer frueheren Sitzung vor.
     navigate(location.pathname, false).finally(() => startHandoff.expireStart());

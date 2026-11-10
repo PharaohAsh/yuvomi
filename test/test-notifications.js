@@ -1,7 +1,7 @@
 /**
  * Modul: Notification-Channel-Test
  * Zweck: Gotify/ntfy Kanalverwaltung, Provider-Mapping, Reminder-Fan-out und Admin-Routen.
- * Ausführen: node --experimental-sqlite test/test-notifications.js
+ * Ausführen: node test/test-notifications.js
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -1226,6 +1226,109 @@ test('admin notification routes manage channels and test sends', async () => {
 });
 
 /* ------------------------------------------------------------------ *
+ * Die Kanal-Routen verwalten nur Haushaltskanaele
+ *
+ * Sie sind Admin-Routen, und ein Haushaltskanal hoert nur, was jeder sehen
+ * darf. Ein Kanal mit `scope = 'user'` hoert dagegen auch die privaten
+ * Erinnerungen seiner Person; ueber diese Routen duerfte ein Admin also lesen,
+ * was `private` gerade vor ihm verbirgt (DECISIONS 1). Zugesichert wird die
+ * Wirkung am Erinnerungslauf, nicht nur die gespeicherte Spalte.
+ * ------------------------------------------------------------------ */
+
+function channelRouteHarness(store, db, buildRouter) {
+  const router = buildRouter({ database: db, channelStore: store, notificationService: { providers: {} } });
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
+  app.use('/notifications', router);
+  return app;
+}
+
+// Bobs private Aufgabe wird faellig; geliefert wird nur, was dabei an einen
+// Kanal ginge. Die Attrappe ersetzt den Anbieter, es geht nichts ins Netz.
+async function channelsHearingPrivateReminder(db, store) {
+  const { processDueNotifications } = await import('../server/services/notifications.js');
+  const task = db.prepare("INSERT INTO tasks (title, created_by, visibility) VALUES ('Privat', 2, 'private')").run();
+  db.prepare("INSERT INTO reminders (entity_type, entity_id, remind_at, created_by) VALUES ('task', ?, ?, 2)")
+    .run(task.lastInsertRowid, pastIso());
+  const heard = [];
+  await processDueNotifications({
+    database: db,
+    channelStore: store,
+    pushService: { sendPushToUser: async () => 0 },
+    providers: { ntfy: { id: 'ntfy', send: async ({ channel }) => { heard.push(channel.name); return { ok: true, status: 200 }; } } },
+  });
+  return heard;
+}
+
+const NTFY_CHANNEL = { provider: 'ntfy', name: 'Kanal', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} };
+
+for (const [label, owner] of [
+  ['scope + userId', { scope: 'user', userId: 2 }],
+  ['scope + user_id', { scope: 'user', user_id: 2 }],
+]) {
+  test(`POST legt immer einen Haushaltskanal an, auch mit ${label} im Body`, async () => {
+    const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+    const { buildRouter } = await import('../server/routes/notifications.js');
+    const db = makeDb();
+    const store = createNotificationChannelStore({ db });
+    const app = channelRouteHarness(store, db, buildRouter);
+
+    const created = await call(app, 'POST', '/notifications/channels', { ...NTFY_CHANNEL, ...owner });
+
+    assert.equal(created.status, 201);
+    assert.equal(created.json.data.scope, 'household');
+    assert.equal(created.json.data.userId, null);
+    assert.deepEqual(await channelsHearingPrivateReminder(db, store), [],
+      'Ein ueber die Route angelegter Kanal hoert keine private Erinnerung.');
+  });
+
+  test(`PUT haengt einen Haushaltskanal nicht um, auch nicht mit ${label} im Body`, async () => {
+    const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+    const { buildRouter } = await import('../server/routes/notifications.js');
+    const db = makeDb();
+    const store = createNotificationChannelStore({ db });
+    const app = channelRouteHarness(store, db, buildRouter);
+    const channel = store.createChannel(NTFY_CHANNEL);
+
+    const updated = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { name: 'Neu', ...owner });
+
+    assert.equal(updated.status, 200);
+    assert.equal(updated.json.data.name, 'Neu', 'Der Rest des Bodys wirkt weiter.');
+    assert.equal(updated.json.data.scope, 'household');
+    assert.equal(updated.json.data.userId, null);
+    assert.deepEqual(await channelsHearingPrivateReminder(db, store), []);
+  });
+}
+
+test('PUT aendert keinen persoenlichen Kanal: sein Ziel bleibt, wo es ist', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = channelRouteHarness(store, db, buildRouter);
+  const channel = store.createChannel({ ...NTFY_CHANNEL, name: 'bobs', scope: 'user', userId: 2 });
+
+  const refused = await call(app, 'PUT', `/notifications/channels/${channel.id}`, {
+    config: { baseUrl: 'https://anderes-ziel.test' },
+    enabled: false,
+  });
+
+  assert.equal(refused.status, 409);
+  const stored = store.getChannel(channel.id);
+  assert.equal(stored.config.baseUrl, 'https://ntfy.test');
+  assert.equal(stored.enabled, true);
+  assert.equal(stored.scope, 'user');
+  assert.equal(stored.userId, 2);
+
+  // Die Grenze liegt an der Route: der eigene Kanal der Person stellt weiter zu.
+  assert.deepEqual(await channelsHearingPrivateReminder(db, store), ['bobs']);
+
+  // Und ein Admin wird so eine Zeile weiterhin los.
+  assert.equal((await call(app, 'DELETE', `/notifications/channels/${channel.id}`)).status, 200);
+});
+
+/* ------------------------------------------------------------------ *
  * E-Mail als vierter Kanal (#944)
  *
  * Der Kanal traegt NUR sein Ziel. Der SMTP-Zugang steht app-weit in
@@ -1526,4 +1629,134 @@ test('ein haengender SMTP-Server blockiert den Erinnerungslauf nicht (#944)', { 
   });
   controller.abort();
   await assert.rejects(() => pending, /timed out/i);
+});
+
+// Phase 0, Abschnitt H: Pruefung und Datenbank teilten einen catch, der jede
+// Meldung als 400 schickte - auch den Text von SQLite. Die Pruefung behaelt
+// ihren Satz, ein Fehler der Datenbank wird ein fester 500.
+test('Kanal anlegen: Pruefung bleibt 400 mit Satz, ein Datenbankfehler wird 500 ohne SQL-Text', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = channelRouteHarness(store, db, buildRouter);
+
+  const invalid = await call(app, 'POST', '/notifications/channels', { ...NTFY_CHANNEL, config: { baseUrl: 'https://ntfy.test', topic: '' } });
+  assert.equal(invalid.status, 400);
+  assert.equal(invalid.json.error, 'ntfy topic is required.');
+
+  db.exec(`CREATE TRIGGER h_guard_channels AFTER INSERT ON notification_channels
+    BEGIN INSERT INTO h_guard_missing_channels (x) VALUES (1); END`);
+  const broken = await call(app, 'POST', '/notifications/channels', NTFY_CHANNEL);
+  assert.equal(broken.status, 500, JSON.stringify(broken.json));
+  assert.equal(broken.json.error, 'Internal error.');
+  assert.doesNotMatch(JSON.stringify(broken.json), /h_guard_missing_channels|no such table/);
+});
+
+// Phase 0, Abschnitt H: der Fehler eines Kanaltests wird gespeichert und mit
+// dem Kanal gelistet. Eigene Saetze der Anbieter bleiben, ein Netzfehler wird
+// als sein Code gespeichert - der Text von Node nennt Adresse und Port.
+test('Kanaltest: ein Netzfehler wird als Code gespeichert, ein eigener Satz bleibt', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  let thrown;
+  const router = buildRouter({ database: db, channelStore: store, notificationService: { providers: {}, testChannel: async () => { throw thrown; } } });
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
+  app.use('/notifications', router);
+  const channel = store.createChannel(NTFY_CHANNEL);
+
+  thrown = new TypeError('fetch failed', { cause: Object.assign(new Error('connect ECONNREFUSED 10.0.0.9:8080'), { code: 'ECONNREFUSED' }) });
+  assert.equal((await call(app, 'POST', `/notifications/channels/${channel.id}/test`)).status, 500);
+  assert.equal(db.prepare('SELECT last_error FROM notification_channels WHERE id = ?').get(channel.id).last_error, 'ECONNREFUSED');
+
+  const lastError = () => db.prepare('SELECT last_error FROM notification_channels WHERE id = ?').get(channel.id).last_error;
+  const { NotificationProviderError } = await import('../server/services/notification-providers/provider-error.js');
+  thrown = new NotificationProviderError('Webhook authentication failed.');
+  await call(app, 'POST', `/notifications/channels/${channel.id}/test`);
+  assert.equal(lastError(), 'Webhook authentication failed.');
+
+  // nodemailer: its own code in `code`, the socket's in `originalCode`.
+  thrown = Object.assign(new Error('connect ECONNREFUSED 10.0.0.9:587'), { code: 'ESOCKET', originalCode: 'ECONNREFUSED' });
+  await call(app, 'POST', `/notifications/channels/${channel.id}/test`);
+  assert.equal(lastError(), 'ECONNREFUSED');
+
+  // A refused SMTP login carries the server's reply; anything without a class
+  // is stored as a fixed sentence, whatever its wording.
+  for (const other of [
+    Object.assign(new Error('Invalid login: 535 5.7.8 user@smtp.internal.lan rejected'), { code: 'EAUTH' }),
+    new Error('Webhook authentication failed.'),
+    new TypeError("Cannot read properties of undefined (reading 'host')"),
+  ]) {
+    thrown = other;
+    await call(app, 'POST', `/notifications/channels/${channel.id}/test`);
+    assert.equal(lastError(), 'The test notification could not be delivered.', other.message);
+  }
+});
+
+test('Kanaltest: die Anbieter werfen ihre eigenen Saetze als NotificationProviderError', async () => {
+  const { NotificationProviderError } = await import('../server/services/notification-providers/provider-error.js');
+  const { gotifyProvider } = await import('../server/services/notification-providers/gotify.js');
+  const { ntfyProvider } = await import('../server/services/notification-providers/ntfy.js');
+  const { webhookProvider } = await import('../server/services/notification-providers/webhook.js');
+  const { emailProvider } = await import('../server/services/notification-providers/email.js');
+  const refused = async () => ({ ok: false, status: 401 });
+  const payload = { title: 'Yuvomi', body: 'Test', url: '/', tag: 't', priority: 'default' };
+  const cases = [
+    [gotifyProvider, { config: { baseUrl: 'https://gotify.test' }, secrets: { appToken: 'x' } }],
+    [ntfyProvider, { config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} }],
+    [webhookProvider, { config: { url: 'https://hook.test/in' }, secrets: {} }],
+  ];
+  for (const [provider, channel] of cases) {
+    await assert.rejects(provider.send({ channel, payload, fetchImpl: refused }), NotificationProviderError, provider.id);
+  }
+  await assert.rejects(
+    emailProvider.send({ channel: { config: { toAddress: 'a@b.test' } }, payload, emailService: { isConfigured: () => false } }),
+    NotificationProviderError,
+  );
+});
+
+// #2622: checkedInput marked EVERY error without `code` as invalid input, so a
+// TypeError from a malformed body went out as a 400 with the engine's text.
+// Only the channel checks' own errors are a 400; the rest is a fixed 500.
+test('Kanal anlegen: ein kaputter Rumpf ist kein 400 mit Engine-Text, sondern ein fester 500 (#2622)', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = channelRouteHarness(store, db, buildRouter);
+
+  const broken = await call(app, 'POST', '/notifications/channels', { ...NTFY_CHANNEL, clearSecrets: 5 });
+  assert.equal(broken.status, 500, JSON.stringify(broken.json));
+  assert.equal(broken.json.error, 'Internal error.');
+  assert.doesNotMatch(JSON.stringify(broken.json), /iterable|TypeError/);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM notification_channels').get().c, 0);
+});
+
+// #2622, test gap: PUT runs through the same sendChannelWriteFailure as POST.
+test('Kanal aendern: Pruefung bleibt 400 mit Satz, Datenbank und kaputter Rumpf werden 500 (#2622)', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { buildRouter } = await import('../server/routes/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const app = channelRouteHarness(store, db, buildRouter);
+  const channel = store.createChannel(NTFY_CHANNEL);
+
+  const invalid = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { config: { topic: '' } });
+  assert.equal(invalid.status, 400, JSON.stringify(invalid.json));
+  assert.equal(invalid.json.error, 'ntfy topic is required.');
+
+  const malformed = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { clearSecrets: 5 });
+  assert.equal(malformed.status, 500, JSON.stringify(malformed.json));
+  assert.equal(malformed.json.error, 'Internal error.');
+
+  db.exec(`CREATE TRIGGER h_guard_channels_update AFTER UPDATE ON notification_channels
+    BEGIN INSERT INTO h_guard_missing_update (x) VALUES (1); END`);
+  const failing = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { name: 'Neu' });
+  assert.equal(failing.status, 500, JSON.stringify(failing.json));
+  assert.equal(failing.json.error, 'Internal error.');
+  assert.doesNotMatch(JSON.stringify(failing.json), /h_guard_missing_update|no such table/);
 });

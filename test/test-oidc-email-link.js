@@ -18,7 +18,7 @@
  * ganzen Server; ersetzt ist nur `openid-client`, also das, was der Callback
  * nach der kryptografischen Pruefung sieht (wie test/test-oidc-contact.js).
  *
- * Ausfuehren: node --experimental-sqlite --experimental-test-module-mocks --test test/test-oidc-email-link.js
+ * Ausfuehren: node --experimental-test-module-mocks --test test/test-oidc-email-link.js
  */
 delete process.env.AUTH_ALLOW_PASSWORD_LOGIN;
 delete process.env.OIDC_ALLOW_SIGNUP;
@@ -245,6 +245,39 @@ test('Konto mit Passwort: die Person verknuepft angemeldet unter Einstellungen, 
   assert.equal(cb.headers.get('location'), '/settings/personal/account?oidc_linked=1');
   assert.equal(await ssoSignIn({ sub: 'sub-ines', email: 'ines@example.com', name: 'Ines' }), '/');
   assert.equal(boundTo('sub-ines')?.username, 'ines');
+});
+
+test('Verknuepfen und Loesen im Konto-Blatt nennen ihren Fall als reason (#1909)', async () => {
+  // Ein zweiter Tab hat schon verknuepft bzw. geloest: das Blatt sagt den Satz
+  // dazu statt des englischen Servertexts.
+  const ines = await login('ines', 'inespass123');
+  const again = await call(ines, 'POST', '/auth/oidc/link/start');
+  assert.equal(again.status, 409, JSON.stringify(again.body));
+  assert.equal(again.body?.reason, 'oidc_already_linked');
+
+  const unlink = await call(ines, 'DELETE', '/auth/oidc/link');
+  assert.equal(unlink.status, 200, JSON.stringify(unlink.body));
+  const twice = await call(ines, 'DELETE', '/auth/oidc/link');
+  assert.equal(twice.status, 409, JSON.stringify(twice.body));
+  assert.equal(twice.body?.reason, 'oidc_not_linked');
+
+  // Ein Konto nur mit SSO hat keinen anderen Weg hinein.
+  await prepareSsoOnly('olga', 'olga@example.com');
+  idp = {
+    claims: { iss: 'https://idp.example/', sub: 'sub-olga', email_verified: true },
+    userinfo: { sub: 'sub-olga', email: 'olga@example.com', email_verified: true, name: 'Olga' },
+  };
+  const start = await fetch(`${base}/api/v1/auth/oidc/start`, { redirect: 'manual' });
+  const cb = await fetch(`${base}/api/v1/auth/oidc/callback?code=c&state=test-state`, {
+    redirect: 'manual', headers: { cookie: cookiesOf(start) },
+  });
+  assert.equal(cb.headers.get('location'), '/', 'Vorbedingung: die erste SSO-Anmeldung findet das Konto');
+  const cookie = cookiesOf(cb, cookiesOf(start));
+  const me = await (await fetch(`${base}/api/v1/auth/me`, { headers: { cookie } })).json();
+  const olga = { cookie, csrf: me.csrfToken };
+  const locked = await call(olga, 'DELETE', '/auth/oidc/link');
+  assert.equal(locked.status, 409, JSON.stringify(locked.body));
+  assert.equal(locked.body?.reason, 'oidc_password_required');
 });
 
 test('Gast der geteilten Ausgaben: ein Mitglied legt keinen mit der Adresse eines Kontos an', async () => {

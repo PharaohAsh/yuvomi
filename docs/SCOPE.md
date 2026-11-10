@@ -163,6 +163,18 @@ deletions cannot be learned at all. Tracked as #1002.
   the Apple half: a HealthKit bridge has to run on Apple's platform and keep working across
   iOS releases, so living outside this repository moves that maintenance rather than
   removing it.
+- **A native app** - the web app stays the complete product, and it goes on a phone without a
+  store, an account or a build step. A Flutter rewrite to replace or sit beside it stays a "not
+  this way" (#255): a second implementation of every feature is a second project, on a
+  maintainer count of one. A native iOS client is the same shape as every other bridge. It
+  lives in its own repository, talks only to `/api/v1`, needs no Yuvomi cloud and no account
+  with anyone but the household's own server, and does what a browser cannot do on an iPhone:
+  widgets, Shortcuts, NFC, HealthKit. It covers what is useful on a phone and links to the
+  browser for the rest. What it does not remove is the store dependency #255 named, and that
+  cost is taken on knowingly: the review, the yearly fee and the release cycle sit with the
+  client and never with the server. Android has no gap of this kind today, because the web app
+  already installs and receives push there, so there is no native Android client on the table;
+  the API a client needs is kept free of platform-specific routes either way.
 - **Another finance app's cloud** - Wallet by BudgetBakers (#959) is the worked example.
   Its REST API takes a personal token per user, so a sidecar holding that token is a route
   that works today, and the Akahu plugin in #746 is the same shape. Both that API and
@@ -252,6 +264,12 @@ deletions cannot be learned at all. Tracked as #1002.
   weight under Health. The full log is a third-party module, with a page of its own in the app
   and its state in a separate service beside Yuvomi rather than in `yuvomi.db`
   ([MODULES.md](../MODULES.md)).
+- **Updating the app from its own interface** (D#2348) is *not here*. In Docker or Podman the app
+  cannot replace its own image without being handed the host's container engine, and a web
+  interface that holds that key is a far larger target than a button is worth. Each install route
+  also updates differently, so one button would mean something different on each. Settings says
+  when a newer version is out; the update itself stays outside the app, with the tools of the
+  install route.
 
 ---
 
@@ -260,12 +278,14 @@ deletions cannot be learned at all. Tracked as #1002.
 The rule is often stated as "Yuvomi has no dependencies". That is not true, and stating it
 that way has cost more than one request a proper answer. What is true splits in two:
 
-- **In the browser: no runtime dependencies, and this half is absolute.** Not because
-  third-party code is bad, but because there is no build step. A browser dependency would
-  have to arrive either through a bundler or from a CDN at runtime, and both are excluded
-  permanently. Third-party frontend code enters by hand instead: copied into
-  `public/vendor/`, committed, with its license and its update steps written down. That
-  path is open and it is used.
+- **In the browser: nothing arrives at runtime, and this half is absolute.** Not because
+  third-party code is bad, but because a household's browser should load only what its own
+  server ships. Since November 2026 the app is built (Vite), and a frontend dependency enters
+  as an npm package with an exact version that the build bundles, listed in the generated
+  third-party notices; a load from a CDN or any other host at runtime stays excluded
+  permanently. Every new browser dependency needs an issue first, because it ends up in every
+  household's browser (the five guarantees in CONTRIBUTING.md, "Hard Constraints"). The hand
+  copies under `public/vendor/` remain until the roadmap moves them.
 - **On the server: small, deliberate, and emphatically not zero.** See `package.json` for
   the current list - it is all infrastructure, and it is chosen rather than accumulated.
 

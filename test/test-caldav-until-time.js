@@ -16,8 +16,8 @@
  * Zeile - samt VTIMEZONE, gefalteter RELATED-TO-Zeile und EXDATE.
  *
  * Ausfuehren:
- *   TZ=UTC            node --experimental-sqlite --test test/test-caldav-until-time.js
- *   TZ=America/Denver node --experimental-sqlite --test test/test-caldav-until-time.js
+ *   TZ=UTC            node --test test/test-caldav-until-time.js
+ *   TZ=America/Denver node --test test/test-caldav-until-time.js
  *
  * BEIDE ZONEN, UND DAS IST DER PUNKT: ein Lauf in UTC allein versteckt jeden
  * Fehler, der die Serverzone mit UTC verwechselt. Die zweite Zone liegt
@@ -84,7 +84,9 @@ function buildDb() {
       outbound_dirty INTEGER NOT NULL DEFAULT 0,
       outbound_attempts INTEGER NOT NULL DEFAULT 0,
       outbound_move_to TEXT,
-      external_object_url TEXT
+      external_object_url TEXT,
+      -- Absage des Anbieters (Migration 281, #2499)
+      provider_status TEXT
     );
     CREATE TABLE calendar_pending_deletions (
       -- Konto der Zeile (Migration 238, #1860)

@@ -21,6 +21,12 @@ graphify-out
 *.db
 *.db-shm
 *.db-wal
+# Secrets the app generates on its first start (server/utils/auto-secrets.js):
+# next to the database, so in the project root without DB_PATH and in data/
+# with Compose. `**/` because Docker's globs do not cross a slash. data/ is the
+# Compose default DATA_DIR and holds the live database itself.
+**/.secrets
+data/
 .nvmrc
 .gitignore
 .dockerignore
@@ -50,6 +56,12 @@ scripts/
 # Exception: the build stage loads every runtime dependency with this script
 # and fails the image when one is missing (#2006).
 !scripts/check-runtime-deps.mjs
+# Exception: the build stage runs `npm run build` (Vite, Phase 1a section D),
+# which needs its plugins and the third-party notices. dist/ is NOT listed
+# here on purpose and is never copied from the context: the build stage makes
+# its own, the runtime stage takes that one (COPY --from=build).
+!scripts/build/
+!scripts/build-third-party-notices.mjs
 
 # Markdown files (README etc.)
 *.md

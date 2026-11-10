@@ -6,14 +6,17 @@
 
 import { untrackWriteRequest } from '../utils/restore-state.js';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { backupToFile, currentVersion, restoreFromFile } from '../db.js';
 import { requireAdmin } from '../auth.js';
 import { createLogger } from '../logger.js';
+import { secretOrigin, storedSecretPath } from '../utils/auto-secrets.js';
 import { createLocalBackup, getStatus as getSchedulerStatus, triggerBackup } from '../services/backup-scheduler.js';
 import * as webdavBackup from '../services/backup-webdav.js';
+import { isLocalFailure, remoteFailure } from '../utils/http.js';
 
 const router = express.Router();
 const log = createLogger('Backup');
@@ -58,6 +61,66 @@ function backupFileName() {
   return `yuvomi-backup-${stamp}.db`;
 }
 
+/**
+ * Was die Admin-Karte ueber den Datenbankschluessel wissen darf, OHNE den Wert:
+ * woher er kommt und ob die Datenbank ueberhaupt verschluesselt ist.
+ *
+ * Einen Wert gibt es nur fuer 'stored' und 'generated' - den hat Yuvomi selbst
+ * erzeugt, und der Betreiber kennt ihn sonst nirgends. Ein Wert aus Env oder
+ * `_FILE` gehoert dem Betreiber und steht schon in dessen Konfiguration; ihn
+ * hier zu zeigen verdoppelte nur die Stellen, an denen er abgreifbar ist.
+ * `origin: null` mit Schluessel heisst: der Handschlag lief in diesem Prozess
+ * nicht (server/utils/auto-secrets.js) - dann ist die Herkunft unbekannt, und
+ * Unbekanntes wird nicht gezeigt.
+ */
+function databaseKeyStatus() {
+  const encrypted = Boolean(process.env.DB_ENCRYPTION_KEY);
+  const origin = encrypted ? secretOrigin('DB_ENCRYPTION_KEY') : null;
+  return { origin, encrypted };
+}
+
+function databaseKeyIsRevealable({ origin, encrypted }) {
+  return encrypted && (origin === 'stored' || origin === 'generated')
+    && storedSecretPath('DB_ENCRYPTION_KEY') !== null;
+}
+
+/**
+ * Schranke fuer die Schluesselanzeige. Ein ehrlicher Admin braucht sie einmal,
+ * zum Sichern; zehn in zehn Minuten lassen Platz fuer Vertipper beim Kopieren
+ * und halten ein Skript mit einer gekaperten Sitzung davon ab, den Wert im
+ * Takt abzuholen. Je Konto gezaehlt, wie der Gravatar-Limiter in auth.js:
+ * hinter einem Proxy ohne `trust proxy` teilt der Haushalt eine IP. Steht
+ * HINTER `requireAdmin`, ein Mitglied verbraucht also nichts.
+ */
+const databaseKeyLimiter = rateLimit({
+  windowMs: 10 * 60_000,
+  max: 10,
+  keyGenerator: (req) => `user:${req.authUserId}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests for the database key. Please wait a few minutes.', code: 429 },
+});
+
+/**
+ * Schranke fuer den Download. Jeder Abruf baut eine volle Kopie der Datenbank
+ * in ein tmp-Verzeichnis - Platte und CPU, so oft man klickt. Ein ehrlicher
+ * Admin laedt ein paar Mal am Tag; zehn in der Stunde halten ein Skript mit
+ * einer gekaperten Sitzung davon ab, den Server damit zuzuschuetten. Je Konto
+ * und HINTER `requireAdmin`, aus denselben Gruenden wie oben (#2524).
+ *
+ * Bewusst in Kauf genommen: die Einstellungen laden per `<a href download>`,
+ * ein 429 endet dort als gescheiterter Download statt als Toast - wie schon
+ * ein 500. Ein fetch mit Blob hielte die ganze Datenbank im Browser.
+ */
+const databaseDownloadLimiter = rateLimit({
+  windowMs: 60 * 60_000,
+  max: 10,
+  keyGenerator: (req) => `user:${req.authUserId}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many backup downloads. Please wait before downloading again.', code: 429 },
+});
+
 router.get('/status', requireAdmin, (req, res) => {
   const schedulerStatus = getSchedulerStatus();
   res.json({
@@ -65,11 +128,41 @@ router.get('/status', requireAdmin, (req, res) => {
       schema_version: currentVersion(),
       restore_upload_limit: RESTORE_LIMIT,
       scheduler: schedulerStatus,
+      // Nur die Herkunft, nie der Wert: der Status wird bei jedem Oeffnen der
+      // Seite geladen, der Schluessel nur auf ausdruecklichen Klick.
+      database_key: databaseKeyStatus(),
     },
   });
 });
 
-router.get('/database', requireAdmin, async (req, res) => {
+/**
+ * GET /api/v1/backup/database-key
+ * Der Datenbankschluessel, den Yuvomi beim ersten Start selbst erzeugt hat -
+ * damit der Admin ihn neben seine Backups legen kann. Ohne ihn oeffnet sich
+ * nach dem Verlust des Volumes kein Backup mehr.
+ *
+ * Gleiche Schwelle wie `GET /database` (keine erneute Anmeldung): wer die
+ * Datenbank herunterladen darf, hat ihren Inhalt ohnehin. Ein Geraet kommt
+ * nicht durch - `requireAuth` macht einen Admin dort zum Mitglied.
+ */
+router.get('/database-key', requireAdmin, databaseKeyLimiter, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const status = databaseKeyStatus();
+  if (!databaseKeyIsRevealable(status)) {
+    return res.json({ data: status });
+  }
+  // Wer, nicht was: der Wert gehoert nie ins Log.
+  log.info(`admin ${req.authUserId} viewed the database key`);
+  res.json({
+    data: {
+      ...status,
+      key: process.env.DB_ENCRYPTION_KEY,
+      path: storedSecretPath('DB_ENCRYPTION_KEY'),
+    },
+  });
+});
+
+router.get('/database', requireAdmin, databaseDownloadLimiter, async (req, res) => {
   let tmpPath = null;
   try {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yuvomi-backup-'));
@@ -88,7 +181,10 @@ router.get('/database', requireAdmin, async (req, res) => {
     if (tmpPath) {
       try { await fs.rm(path.dirname(tmpPath), { recursive: true, force: true }); } catch { /* best effort */ }
     }
-    res.status(500).json({ error: 'Database backup failed.', code: 500 });
+    // Das Backup hat die Integritaetspruefung nicht bestanden (#2520): fester
+    // Grund statt des Satzes, der Befund steht im Log.
+    const reason = err?.reason === 'backup_verify_failed' ? { reason: 'backup_verify_failed' } : {};
+    res.status(500).json({ error: 'Database backup failed.', code: 500, ...reason });
   }
 });
 
@@ -104,7 +200,7 @@ router.post(
     let backupKey = null;
     try {
       if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-        return res.status(400).json({ error: 'Backup file is required.', code: 400 });
+        return res.status(400).json({ error: 'Backup file is required.', code: 400, reason: 'backup_file_empty' });
       }
       backupKey = backupKeyFromHeader(req);
 
@@ -154,7 +250,9 @@ router.post('/trigger', requireAdmin, async (req, res) => {
 
 /**
  * Neuer Server oder Benutzer ohne neues Passwort - eine fehlende Eingabe, keine
- * Stoerung. `errorCode` uebersetzt der Client (admin-backup.js).
+ * Stoerung. `errorCode` uebersetzt der Client (admin-backup.js). The WebDAV
+ * routes name their own cases in this one field (`password_required`,
+ * `url_invalid`, `config_incomplete`, #2622).
  */
 function passwordRequiredResponse(res) {
   return res.status(400).json({
@@ -188,7 +286,7 @@ router.put('/webdav/config', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'url must be a string.', code: 400 });
     }
     if (url && !/^https?:\/\/.+/.test(url.trim())) {
-      return res.status(400).json({ error: 'url must start with http:// or https://.', code: 400 });
+      return res.status(400).json({ error: 'url must start with http:// or https://.', errorCode: 'url_invalid', code: 400 });
     }
     if (keep !== undefined && (typeof keep !== 'number' || keep < 1)) {
       return res.status(400).json({ error: 'keep must be a positive integer.', code: 400 });
@@ -206,6 +304,24 @@ router.put('/webdav/config', requireAdmin, async (req, res) => {
     res.status(500).json({ error: 'Failed to save WebDAV config.', code: 500 });
   }
 });
+
+/**
+ * The answer of a WebDAV route once its own cases are handled (Phase 0 section
+ * H): a refusal of the server as its class (502, `reason` + `detail` such as
+ * `HTTP 401` or `ECONNREFUSED`, which the backup page shows the admin). A
+ * failure on this server - the database, or a filesystem or crypto error
+ * without an HTTP status (isLocalFailure, #2622) - is a fixed 500 with
+ * `backup_local_failed`. Any other error counts as the remote side
+ * (`remote_failed`, no `detail`). Never the text of the server, of fetch or of
+ * the filesystem - it names URLs, status lines and absolute paths.
+ */
+function sendWebdavFailure(res, err, sentence) {
+  const failure = isLocalFailure(err) ? null : remoteFailure(err);
+  if (failure) {
+    return res.status(502).json({ error: 'The WebDAV server refused the request or could not be reached.', code: 502, ...failure });
+  }
+  return res.status(500).json({ error: sentence, code: 500, reason: 'backup_local_failed' });
+}
 
 /**
  * POST /api/v1/backup/webdav/test
@@ -229,7 +345,10 @@ router.post('/webdav/test', requireAdmin, async (req, res) => {
     res.json({ data: result });
   } catch (err) {
     log.error('WebDAV connection test failed:', err);
-    res.status(400).json({ error: err.message ?? 'Connection test failed.', code: 400 });
+    if (err.code === 'webdav_config_incomplete') {
+      return res.status(400).json({ error: 'URL, username and password are required.', code: 400, errorCode: 'config_incomplete' });
+    }
+    sendWebdavFailure(res, err, 'Connection test failed.');
   }
 });
 
@@ -243,7 +362,7 @@ router.get('/webdav/files', requireAdmin, async (req, res) => {
     res.json({ data: files });
   } catch (err) {
     log.error('WebDAV file listing failed:', err);
-    res.status(500).json({ error: err.message ?? 'Failed to list remote files.', code: 500 });
+    sendWebdavFailure(res, err, 'Failed to list remote files.');
   }
 });
 
@@ -255,18 +374,26 @@ router.get('/webdav/files', requireAdmin, async (req, res) => {
  */
 router.post('/webdav/trigger', requireAdmin, async (req, res) => {
   try {
-    const filePath = await createLocalBackup();
+    // Two steps with two kinds of failure: the local snapshot (filesystem,
+    // a fixed 500) and the upload (the server's answer, its class).
+    let filePath;
+    try {
+      filePath = await createLocalBackup();
+    } catch (err) {
+      log.error('WebDAV manual upload: local snapshot failed:', err);
+      return res.status(500).json({ error: 'The local backup could not be created.', code: 500, reason: 'backup_local_failed' });
+    }
     await webdavBackup.uploadBackup(filePath);
     res.json({ data: { file: path.basename(filePath), timestamp: new Date().toISOString() } });
   } catch (err) {
     log.error('WebDAV manual upload failed:', err);
-    res.status(500).json({ error: err.message ?? 'WebDAV upload failed.', code: 500 });
+    sendWebdavFailure(res, err, 'WebDAV upload failed.');
   }
 });
 
 router.use((err, req, res, next) => {
   if (err?.type === 'entity.too.large') {
-    return res.status(413).json({ error: `Backup file is too large. Maximum upload size is ${RESTORE_LIMIT}.`, code: 413 });
+    return res.status(413).json({ error: `Backup file is too large. Maximum upload size is ${RESTORE_LIMIT}.`, code: 413, reason: 'backup_file_too_large', params: { limit: String(RESTORE_LIMIT) } });
   }
   next(err);
 });

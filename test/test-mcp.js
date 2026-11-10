@@ -8,7 +8,7 @@
  *        Dazu die Rechte-Durchsetzung der Tool-Schicht (#823): Modulrechte des
  *        Nutzers, Token-Scopes und Split-Guests — die Kern-Tools laufen an der
  *        /api/v1-Middleware vorbei und müssen dieselbe Grenze selbst ziehen.
- * Ausführen: node --experimental-sqlite --test test/test-mcp.js
+ * Ausführen: node --test test/test-mcp.js
  */
 
 import { test } from 'node:test';
@@ -250,6 +250,33 @@ test('tools/call list_tasks: was erst spaeter beginnt, ist noch nicht dran', asy
     withFuture.some((t) => t.title === 'Erst naechste Woche'),
     'mit include_future muss sie erscheinen - sonst waere sie ueber MCP gar nicht erreichbar',
   );
+});
+
+// "Heute" ist der Tag der Haushaltszone wie in GET /tasks, nicht der Prozesstag.
+// Von +14 und -11 weicht immer mindestens eine Zone vom Prozesstag ab.
+test('tools/call list_tasks: Startdatum-Riegel rechnet "heute" in der Haushaltszone', async (t) => {
+  const { todayKey } = await import('../server/utils/timezone.js');
+  const { toLocalDateKey } = await import('../public/utils/date.js');
+  const setZone = db.prepare(`INSERT INTO sync_config (key, value) VALUES ('household_timezone', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value`);
+  const zone = ['Pacific/Kiritimati', 'Pacific/Pago_Pago'].find((z) => {
+    setZone.run(z);
+    return todayKey(db) !== toLocalDateKey();
+  });
+  t.after(() => db.prepare(`DELETE FROM sync_config WHERE key = 'household_timezone'`).run());
+  assert.ok(zone);
+
+  const today = todayKey(db);
+  const tomorrow = new Date(Date.parse(`${today}T12:00:00Z`) + 86400000).toISOString().slice(0, 10);
+  const insert = db.prepare(
+    `INSERT INTO tasks (title, created_by, status, visibility, start_date) VALUES (?, ?, 'open', 'all', ?)`
+  );
+  insert.run('Zone ab heute', uid, today);
+  insert.run('Zone ab morgen', uid, tomorrow);
+
+  const titles = parseContent(await toolCall('list_tasks', {})).map((row) => row.title);
+  assert.ok(titles.includes('Zone ab heute'), `beginnt heute (${zone}) und ist dran`);
+  assert.ok(!titles.includes('Zone ab morgen'), `beginnt morgen (${zone}) und ist noch nicht dran`);
 });
 
 test('tools/call create_task + list_tasks: Tags reisen mit (#586)', async () => {

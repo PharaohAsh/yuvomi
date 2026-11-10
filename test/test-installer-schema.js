@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
+import { resolveDbPath } from '../server/utils/db-path.js';
 import { ENV_SCHEMA } from '../tools/installer/env-schema.js';
 
 const ORIGINAL_KEYS = [
@@ -209,6 +211,11 @@ const INTENTIONALLY_NOT_IN_INSTALLER = {
     + 'mit invalid_client beantwortet (#2144). Leer ist fuer jede neue Installation richtig, und '
     + 'der Wizard kennt den Anbieter nicht: ein Feld waere eine Frage, die niemand vor der ersten '
     + 'Anmeldung beantworten kann. Ein Schema-Eintrag ohne Feld verbietet der Guard weiter unten.',
+  DB_ENCRYPTION_AUTO_KEY:
+    'Schaltet nur das Erzeugen eines Schluessels beim ersten Start ab (server/utils/auto-secrets.js). '
+    + 'Der Wizard schreibt DB_ENCRYPTION_KEY immer selbst in die .env, dort erzeugt die App also nie '
+    + 'einen - der Schalter haette in jeder Wizard-Installation keine Wirkung, und ein Feld dafuer '
+    + 'waere eine Frage ohne Folge. Er ist fuer Installationen ohne Wizard (Kataloge, Compose von Hand).',
   DB_ALLOW_NEWER_SCHEMA:
     'Notfallschalter, keine Installationsentscheidung: laesst eine aeltere App auf einer '
     + 'neueren Datenbank starten, obwohl das dabei Geschriebene beim naechsten Update verloren '
@@ -650,6 +657,24 @@ test('Jedes Container-Deployment schreibt Backups nach /backups (issue #579)', (
   assert.ok(backupVar, 'Unraid deklariert BACKUP_DIR nicht');
   assert.match(backupVar[0], /Default="\/backups"/, 'Unraid BACKUP_DIR muss /backups defaulten');
   assert.match(unraid, /Target="\/backups"[^>]+Type="Path"/, 'Unraid mountet kein /backups');
+});
+
+test('Das Image legt die Datenbank ohne DB_PATH auf das /data-Volume', () => {
+  // Ohne DB_PATH fiele die App auf ihren Bare-Metal-Default zurueck: yuvomi.db im
+  // Projektverzeichnis, also /app im Container. Dort darf der node-User nichts
+  // anlegen; die automatisch erzeugten Secrets (.secrets neben der Datenbank)
+  // scheitern mit EACCES und der Container beendet sich. Ein schlichtes
+  // `docker run -v daten:/data` muss trotzdem starten und auf dem Volume schreiben.
+  const dockerfile = readFileSync(new URL('../Dockerfile', import.meta.url), 'utf8');
+  assert.match(
+    dockerfile,
+    /^ENV DB_PATH=\/data\/yuvomi\.db$/m,
+    'Dockerfile muss DB_PATH=/data/yuvomi.db als Image-Default setzen'
+  );
+  const imageDefault = dockerfile.match(/^ENV DB_PATH=(.+)$/m)[1];
+  const { dbPath } = resolveDbPath({ DB_PATH: imageDefault });
+  assert.equal(path.dirname(dbPath), '/data', 'Image-Default muss auf dem /data-Volume landen');
+  assert.match(dockerfile, /mkdir -p \/data /, 'Dockerfile legt /data nicht an');
 });
 
 test('Wer die .env in den Container laedt, pinnt MODULES_DIR auf /app/modules', () => {
@@ -1254,13 +1279,21 @@ test('das Portainer-App-Template fragt genau ab, was der verlinkte Stack braucht
   assert.deepEqual(unknown, [],
     `Diese Formularfelder interpoliert ${template.repository.stackfile} nicht.`);
 
-  const required = [...stack.matchAll(/\$\{([A-Z0-9_]+):\?/g)].map((m) => m[1]);
-  assert.ok(required.length >= 2,
-    `Nur ${required.length} Pflichtvariablen im Stack gefunden (gemessen: SESSION_SECRET, `
-    + 'DB_ENCRYPTION_KEY) - die Suche greift nicht mehr.');
-  for (const name of required) {
+  // Seit v2.85.0 (#2507) erzeugt der Server beide Secrets beim ersten Start,
+  // wenn sie leer bleiben. Der Stack darf sie deshalb NICHT mehr per
+  // `${VAR:?...}` erzwingen: ein Deploy ohne sie ist der Normalfall, kein
+  // Fehler. Das Formular bietet sie weiter an - wer eigene Werte halten will,
+  // trägt sie ein -, und ein Default bleibt verboten, weil er für jede
+  // Installation derselbe wäre.
+  const erzwungen = [...stack.matchAll(/\$\{([A-Z0-9_]+):\?/g)].map((m) => m[1]);
+  assert.deepEqual(erzwungen, [],
+    `Diese Variablen brechen den Deploy ab, obwohl der Start sie selbst erzeugt: ${erzwungen.join(', ')}`);
+
+  for (const name of ['SESSION_SECRET', 'DB_ENCRYPTION_KEY']) {
+    assert.match(stack, new RegExp(`\\$\\{${name}:-\\}`),
+      `${name} muss im Stack mit leerem Default stehen (\${${name}:-})`);
     const field = env.find((e) => e.name === name);
-    assert.ok(field, `${name} ist im Stack Pflicht, fehlt aber im Formular`);
+    assert.ok(field, `${name} fehlt im Formular - niemand koennte einen eigenen Wert setzen`);
     assert.equal(field.default ?? '', '',
       `${name} darf keinen Default tragen - er waere fuer jede Installation derselbe`);
   }

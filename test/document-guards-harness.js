@@ -46,6 +46,7 @@ import puppeteer from 'puppeteer';
 import { launchBrowser } from '../scripts/lib/chrome-executable.js';
 import { SETTINGS_LEAVES } from '../public/settings/registry.js';
 import { tempDir } from './tmp-dir.js';
+import { layoutOf } from '../server/utils/frontend-dir.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -213,12 +214,20 @@ function startServer(dbPath, port) {
       BIND_ADDRESS: '127.0.0.1',
       BASE_URL: `http://127.0.0.1:${port}`,
       SESSION_SECRET: 'document-guards-secret-0123456789abcdef',
+      // Kein beim Start erzeugter Schluessel fuer die Harness-DB
+      // (server/utils/auto-secrets.js): die Suite misst Oberflaeche.
+      DB_ENCRYPTION_AUTO_KEY: 'false',
       // Der Login-Limiter laesst fuenf Versuche pro Minute zu. Das ist fuer die
       // App richtig und fuer eine Suite, die mehrfach hintereinander laeuft,
       // eine Fehlerquelle, die wie ein fehlender Seed aussieht.
       RATE_LIMIT_MAX_ATTEMPTS: '1000',
       // Hintergrundarbeit aus dem Messfenster halten.
       DISABLE_BACKUP_SCHEDULER: '1',
+      // Die Browser-Suiten laufen gegen die Testanordnung (npm run
+      // build:browser-tests); der Server liefert sie nur auf ausdruecklichen
+      // Wunsch (server/utils/frontend-dir.js). Die Smoke-Suite des
+      // ausgelieferten Builds (test:built-app-browser) laeuft gegen das Buendel.
+      YUVOMI_BUILD_LAYOUT: layoutOf(join(REPO, 'dist')) === 'modules' ? 'modules' : '',
     },
     stdio: 'ignore',
   });
