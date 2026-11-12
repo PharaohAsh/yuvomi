@@ -13,6 +13,150 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   delay before the screensaver starts, it is stored on each device, so a slow photo frame in the
   hallway and a quicker kitchen tablet keep their own pace.
 
+## [2.89.1] - 2026-11-12
+
+### Security
+- **A signed-in device can no longer change the email addresses of a household member.**
+  SECURITY.md says that a device credential changes neither password, email nor second factor.
+  The addresses of the contact that belongs to an account were outside that rule, and they are
+  where a password reset is sent. A device is now refused there like a module-scoped token
+  (`403`, `contact_email_protected`), for the person's own contact too. The other fields of the
+  contact stay editable from a device, and a browser session or a full-access token changes
+  the addresses as before.
+- **The Umbrel catalog workflow no longer runs foreign code next to its token.** On every
+  release it ran the catalog repository's linter and installed its npm dependencies in the step
+  that held the token for the catalog fork. It now has three jobs: one edits the catalog files
+  as text, one runs the linter with no secret and no rights and installs with
+  `npm ci --ignore-scripts`, and only the last one holds the token and pushes. Nothing changes
+  for an installation.
+
+## [2.89.0] - 2026-11-12
+
+### Foundation
+- **A readiness endpoint `/readyz` next to `/health`.** `/health` only says that the process
+  answers, and it stays `200` during a restore so that Docker does not restart the container in
+  the middle of one. `/readyz` says whether the instance can serve right now: `200` with
+  `{"status":"ready"}`, or `503` with `{"status":"not_ready","reason":"..."}` while a restore is
+  running, the database connection is closed, the database is older than this version expects or
+  the data folder refuses writes. It needs no login, tells nothing else about the instance and
+  does not write to the database. `/health` and every shipped healthcheck stay as they are; the
+  new path is for a load balancer or an uptime monitor.
+- **Unexpected errors are answered and logged in one place.** The central error handler now
+  keeps the status of a client error that is marked as safe to show; until now every error
+  that reached it was a 500. Its sentence and `reason` reach the client only from a
+  `HttpError` (`server/utils/http-error.js`), whose text we write ourselves; a 4xx of the HTTP
+  libraries gets a fixed sentence such as "The request was refused (Bad Request).", because
+  body-parser wraps foreign text (zlib) that way. Requests the HTTP layer refuses now get their
+  4xx instead of a 500: a corrupt compressed body, an aborted upload or a body shorter than its
+  `Content-Length` 400, a form nested too deep 400, too many form fields 413, an unsupported
+  `Content-Encoding` or charset 415. A path parameter that does not decode (`%ZZ`) is a 400.
+  Everything else stays a 500 with the fixed sentence, and the raw text stays in the log. The
+  log line names the method, the route pattern and the status instead of the path, and the
+  raw segment of an undecodable parameter is no longer written, so a calendar feed token in the
+  URL no longer lands in the log. The cause of an error is logged with it.
+- **The status of the last backup survives a restart.** After a restart the backup page said
+  "never" until the next scheduled run, because the last attempt lived in memory only. The time of
+  the last attempt, the time of the last success and the reason of a failed attempt are now kept
+  in the database, without a schema change, and a restore keeps the values of the installation it
+  runs on rather than those inside the restored file. `GET /api/v1/backup/status` gains
+  `scheduler.lastSuccess`.
+- **A restore drill checks that a release database restores and migrates on this version.**
+  `scripts/restore-drill.mjs` restores a database through the same restore command an operator
+  uses, migrates it to the current schema and checks its integrity, foreign keys, schema and row
+  counts before it starts the server on it and reads every module. The rollback probe that
+  tries the way back before a foundation release moved into the repository as
+  `scripts/rollback-probe/`. Nothing changes for an installation.
+- **Releases that change the database schema carry a frozen demo database.** A new workflow
+  attaches `yuvomi-<version>-corpus.db` and its `.sha256` to every release whose schema differs
+  from the last one with such a file, and to every foundation release. It is the demo seed of
+  that release, encrypted with a public test key, and the restore drill migrates each of them
+  to the current version. Nothing changes for an installation.
+- **Every day and in every pull request, all of those databases are restored and migrated.**
+  A new workflow downloads each release's frozen database, restores it the way an operator
+  would, migrates it to the code under test and starts the server on it. A migration that
+  breaks an older database now fails in CI, and the run is also red when the newest release
+  changed the schema but has no frozen database. Nothing changes for an installation.
+- **Lint, layer and dead-code checks run on every pull request.** A new `lint` job runs
+  oxlint, dependency-cruiser, knip and zizmor and compares their findings with
+  `lint-baseline.json`, one count per file and rule that only sinks: a new finding or a rising
+  count fails, as with the type baseline. An assignment to `innerHTML` and an `await` inside a
+  database transaction have no baseline and fail at the first finding. Contributors run
+  `npm run lint` before a push; CONTRIBUTING.md lists the rules. Nothing changes for an
+  installation.
+- **Tests that read source code as text are listed and counted.**
+  `test/text-reader-inventory.json` names every suite that reads a file under `public/` or
+  `server/` as text, with the files it reads and what becomes of it. A new suite of that kind
+  without an entry fails `npm run test:text-reader-inventory`, and the number of checks that
+  hold a spelling instead of a behaviour only sinks. docs/test-suites.md has the rules. Nothing
+  changes for an installation.
+- **CI runs the test suites side by side and takes about ten minutes instead of thirty.**
+  The `Tests` job now runs `npm run test-parallel` with four jobs instead of `npm test`. A red
+  suite no longer hides the ones after it: the job log ends with every red suite and its log,
+  and when one is red, the logs are attached to the run. Contributors run `npm run test-parallel` before a push.
+  A new push to a pull request cancels the run it replaces.
+- **The way back to 2.88.1 was tried before the tag.** Image 2.88.1 and this build ran in turn
+  on the same demo database, in production mode with a generated encryption key. Neither start
+  applied a migration, every module answered the same through the API before and after, and
+  the service worker switched from 2.88.1 to 2.89.0 and back without an error screen or a
+  failed request, with the session staying signed in. A backup made on 2.89.0 restored on
+  2.88.1 through the admin restore, and 2.88.1 started on a database that carries the new
+  backup status without a word about it. To go back, pin the image tag `2.88.1`.
+
+### Added
+- **Admins can ask the server what it runs on.** `GET /api/v1/system/diagnostics` answers with
+  the version and build revision, the Node.js and SQLite versions, platform, schema version and
+  the time of the last migration, the size of the database and its write-ahead log, free space on
+  the data volume, uptime, the status of the last backup with the next scheduled run, where the
+  database key comes from, readiness and the number of installed modules. It never carries a key,
+  a path, a hostname, the value of an environment variable or anything about a member, and it is
+  refused for members and for signed-in devices. `GET /api/v1/backup/status` gains
+  `scheduler.nextRun`. The settings page does not show any of this yet.
+
+### Changed
+- **The container image of a release is now built from its tag alone.** Until now a release
+  build reused layers from the build cache that builds of `main` fill, the dependency install
+  and the app build included. A tagged build now ignores that cache and writes none; only the
+  rolling `main` image keeps it. Nothing changes for an installation.
+- **A failed backup says why, with a reason instead of the text of the error** (from #2525,
+  the `reason` on the last error proposed by @nomi25home in #2540). `scheduler.lastError` in
+  `GET /api/v1/backup/status` now always carries `reason`, one of `backup_dir_not_writable`,
+  `disk_full`, `backup_verify_failed` and `unknown`, and its `message` is the fixed sentence of
+  that reason. Until now `message` was the raw text of the error, with the absolute path of the
+  backup folder in it; that text is in the server log only now, where it still names the folder
+  and what to check. `POST /api/v1/backup/trigger` answers a failed run as before with `200` and
+  `success: false`, and carries the same `reason`. The backup page does not show the reason yet.
+
+### Fixed
+- **The demo seed finds the database key the server stored itself.** `scripts/seed-demo.js
+  --db <path>` now reads `DB_ENCRYPTION_KEY_FILE` and the key a first start keeps under
+  `.secrets/` next to the database, in the same order as the server. Until now it stopped on an
+  encrypted database unless the key was in the environment or in `.env`.
+
+## [2.88.1] - 2026-11-11
+
+### Security
+- **Medication reminders to a person's own notification channel now go through the same SSRF
+  guard as every other channel delivery.** Until now they were sent with an unguarded request.
+  The deployment switch `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true` applies to them as it does to
+  the other channels: a person whose own Gotify, ntfy or webhook channel lives in the local
+  network needs that switch for medication reminders too, as it was already needed for every
+  other reminder.
+
+### Upcoming: foundation release 2.89.0 (quality and operations)
+- **The next release changes how Yuvomi is tested and operated, not what it does.** It is
+  planned for Friday, 13 November 2026, at the earliest, and carries no new feature; pages,
+  data and the database stay as they are. This note is the advance notice for it.
+- **A readiness endpoint `/readyz` next to `/health`.** It answers `503` with a reason while
+  the instance cannot serve, for a load balancer or an uptime monitor. The existing `/health`
+  does not change, and neither does any shipped healthcheck.
+- **The status of the last backup survives a restart.** Today the backup page says "never"
+  after a restart until the next scheduled run.
+- **The way back stays open.** The release does not change the database, so pinning the image
+  tag `2.88.1` returns to this version with your data untouched (installation guide, "Pinning a
+  version"). That way is tried once before the release is tagged.
+
+## [2.88.0] - 2026-11-10
+
 ### Foundation
 - **The web app now ships built**, bundled and minified by Vite 8 with source maps, and the
   service worker takes its offline list from the build instead of a hand-kept one; pages,
@@ -46,6 +190,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reproducible build with two attested release artifacts), describes the build and the type
   check, and docs/DECISIONS.md records the build step, the Node floor and the position on
   hosting as entries 20 to 22.
+- **The way back to 2.87.0 was tried before the tag.** Image 2.87.0 and this build ran in turn
+  on the same demo database, in production mode with a generated encryption key. Neither start
+  applied a migration, every module answered the same through the API before and after, and
+  the service worker switched from 2.87.0 to 2.88.0 and back without an error screen or a
+  failed request, with the session staying signed in. A backup made on 2.88.0 restored on
+  2.87.0 through the admin restore. To go back, pin the image tag `2.87.0`.
 
 ### Changed
 - **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
@@ -58,6 +208,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   device - Night hours, 22:00 to 06:00 unless you change it) the screensaver now shows a plain
   black screen with no photo, clock or caption, and loads no photos. It fades to black at the
   start of the night and back to photos at the end, by itself. Wall mode still dims as before.
+
+### Fixed
+- **The in-app changelog shows a summary whole when it runs over two lines.** An entry whose
+  bold first sentence wrapped in the source lost the end of that sentence to the text below
+  it, so the short form read "... on iPhone and" with "iPad)." opening the reason. This hit
+  154 entries since 2.45.0; summary and reason are now split where the sentence ends.
+- **Birthdays no longer rewrite their calendar entries every minute.** The check that keeps a
+  birthday's calendar entry and reminder in step runs once a minute for every account, and on
+  every visit to the birthday list. It wrote each entry again even when nothing had changed,
+  which also rebuilt the entry in the search index: constant small writes to the database, on
+  a NAS or a Raspberry Pi to its disk or SD card. It now writes only what differs.
+- **Pages open from the app's cache without a round trip to the server.** The service worker
+  asked the network first for every page and module before handing out the copy it already
+  held, although the built files under `/assets/` carry a hash of their content in the name and
+  never change under it; it now serves them straight from its cache and fetches only a file
+  that is missing. Files without a hash, such as `index.html` and `/api.js`, still come from the
+  network first. The PDF viewer (pdf.js) also no longer lands in the worker's cache after the
+  first opened document: documents are not available offline, so it is left to the browser.
+- **On a phone, the tool row of Recipes, Pantry, Meals and Shopping folds away on scroll in
+  browsers that need the menu polyfill too.** The rule that folds it keeps the row while one
+  of its menus is open, and it asked for that with a selector those browsers do not know, so
+  they dropped the whole rule and the row kept its space above the list. It now has a second
+  rule that asks the way the polyfill marks an open menu.
+- **An up-to-date browser that lands on the "browser too old" page now returns to the app on
+  its own.** Opened from a bookmark, or reloaded after a browser update, the page kept saying
+  the browser was too old until you pressed "Try again"; it now runs the same check as the app
+  and sends a browser that passes it back to the start page. A browser that is too old stays
+  on the page. The page and the offline page also no longer request a language file they
+  never use.
 
 ## [2.87.0] - 2026-11-08
 

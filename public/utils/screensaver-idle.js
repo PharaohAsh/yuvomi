@@ -161,7 +161,7 @@ export const SCREENSAVER_SLIDE_KEY = 'yuvomi-screensaver-slide';
 export const SCREENSAVER_SLIDE_STEPS = [10, 20, 30, 60, 120, 300];
 
 /** Unchanged from before the setting existed: twenty seconds. */
-export const SCREENSAVER_SLIDE_DEFAULT = 20;
+const SCREENSAVER_SLIDE_DEFAULT = 20;
 
 /** The time per photo chosen on THIS device, in seconds; anything else is the default. */
 export function getScreensaverSlideSeconds() {
